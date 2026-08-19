@@ -382,19 +382,19 @@ async function runBot() {
 
     // 4. Render & Kirim Gambar Banner ke Topic "PREDIKSI GAMBAR TOGEL" (Topic 27)
     if (macauGroupData.length > 0) {
-      const buffer = await drawGroupBanner(macauGroupData, './template-totomacau.jpg', tanggalFormatted);
+      const buffer = await drawGroupBanner(macauGroupData, './template-totomacau.jpg.jfif', tanggalFormatted);
       await sendTelegramBannerPhoto(buffer, captionBase);
       console.log(`[TELEGRAM] ✅ Banner Toto Macau terkirim ke Topic ID 27 (PREDIKSI GAMBAR TOGEL).`);
     }
 
     if (group1Data.length > 0) {
-      const buffer = await drawGroupBanner(group1Data, './template-pasaran-1.jpg', tanggalFormatted);
+      const buffer = await drawGroupBanner(group1Data, './template-pasaran-1.jpg.jfif', tanggalFormatted);
       await sendTelegramBannerPhoto(buffer, captionBase);
       console.log(`[TELEGRAM] ✅ Banner Pasaran 1 terkirim ke Topic ID 27 (PREDIKSI GAMBAR TOGEL).`);
     }
 
     if (group2Data.length > 0) {
-      const buffer = await drawGroupBanner(group2Data, './template-pasaran-2.jpg', tanggalFormatted);
+      const buffer = await drawGroupBanner(group2Data, './template-pasaran-2.jpg.jfif', tanggalFormatted);
       await sendTelegramBannerPhoto(buffer, captionBase);
       console.log(`[TELEGRAM] ✅ Banner Pasaran 2 terkirim ke Topic ID 27 (PREDIKSI GAMBAR TOGEL).`);
     }
