@@ -43,6 +43,22 @@ function generateBBFS() {
   return digits.join('');
 }
 
+// Helper: Ambil Kombinasi Digit Secara Acak Tanpa Duplikat
+function getRandomDigitCombo(bbfsArr, digitLength, count) {
+  const results = new Set();
+  
+  // Lakukan pencarian pola acak sampai memenuhi kuota jumlah kombinasi (count)
+  let attempts = 0;
+  while (results.size < count && attempts < 50) {
+    attempts++;
+    const shuffled = [...bbfsArr].sort(() => 0.5 - Math.random());
+    const combo = shuffled.slice(0, digitLength).join('');
+    results.add(combo);
+  }
+  
+  return Array.from(results).join('*');
+}
+
 // Helper: Generator Turunan Angka dari BBFS
 function generatePredictionDetails(bbfsStr) {
   const arr = bbfsStr.split('');
@@ -57,10 +73,10 @@ function generatePredictionDetails(bbfsStr) {
   const shio = DAFTAR_SHIO[Math.floor(Math.random() * DAFTAR_SHIO.length)];
   const twin = `${arr[0]}${arr[0]}*${arr[1]}${arr[1]}`;
   
-  // Kombinasi 2D, 3D, 4D dari BBFS
+  // Kombinasi 2D, 3D, dan 4D (Masing-masing dibuat 5 Kombinasi Unik)
   const d2 = `${arr[0]}${arr[1]}*${arr[1]}${arr[2]}*${arr[2]}${arr[3]}*${arr[3]}${arr[4]}*${arr[0]}${arr[4]}`;
-  const d3 = `${arr[0]}${arr[1]}${arr[2]}*${arr[1]}${arr[2]}${arr[3]}*${arr[2]}${arr[3]}${arr[4]}`;
-  const d4 = `${arr[0]}${arr[1]}${arr[2]}${arr[3]}*${arr[1]}${arr[2]}${arr[3]}${arr[4]}`;
+  const d3 = getRandomDigitCombo(arr, 3, 5); // 5 Kombinasi 3D (Contoh: "138*384*849*491*139")
+  const d4 = getRandomDigitCombo(arr, 4, 5); // 5 Kombinasi 4D (Contoh: "1384*3849*8491*4913*1394")
 
   return { cb, cm, shio, twin, d2, d3, d4 };
 }
@@ -72,11 +88,11 @@ async function runBot() {
 
   try {
     // 1. Cek Aktivasi Bot (Di-OFF-kan / ON-kan via Admin)
-      const botConfigDoc = await db.collection('settings').doc('bot_control').get();
-      if (botConfigDoc.exists && botConfigDoc.data().active === false) {
+    const botConfigDoc = await db.collection('settings').doc('bot_control').get();
+    if (botConfigDoc.exists && botConfigDoc.data().active === false) {
       console.log("[BOT] Status bot OFF di admin control. Eksekusi dihentikan.");
       return;
-}
+    }
 
     const batch = db.batch();
     const prediksiRef = db.collection('prediksi');
@@ -86,7 +102,7 @@ async function runBot() {
       const bbfs = generateBBFS();
       const details = generatePredictionDetails(bbfs);
 
-      // Struktur Data 100% Persis dengan save-prediksi.js Anda
+      // Struktur Data Firestore
       const payload = {
         pasaran: pasaran,
         tanggal: tanggalWIB,
@@ -105,7 +121,6 @@ async function runBot() {
       };
 
       // Simpan menggunakan ID gabungan (contoh: "2026-08-20_HONGKONG")
-      // Menggunakan set + merge agar tidak duplikat jika di-run berulang kali
       const docId = `${tanggalWIB}_${pasaran.replace(/\s+/g, '')}`;
       const docRef = prediksiRef.doc(docId);
       
