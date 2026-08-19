@@ -72,11 +72,11 @@ async function runBot() {
 
   try {
     // 1. Cek Aktivasi Bot (Di-OFF-kan / ON-kan via Admin)
-    const botConfigDoc = await db.collection('settings').doc('bot_config').get();
-    if (botConfigDoc.exists && botConfigDoc.data().is_active === false) {
-      console.log("[BOT] Status bot OFF di admin setting. Eksekusi dihentikan.");
+      const botConfigDoc = await db.collection('settings').doc('bot_control').get();
+      if (botConfigDoc.exists && botConfigDoc.data().active === false) {
+      console.log("[BOT] Status bot OFF di admin control. Eksekusi dihentikan.");
       return;
-    }
+}
 
     const batch = db.batch();
     const prediksiRef = db.collection('prediksi');
