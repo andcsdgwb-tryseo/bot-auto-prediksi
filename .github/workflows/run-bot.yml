@@ -2,8 +2,8 @@ name: Bot Auto Runner
 
 on:
   schedule:
-    # Setel ke jam 08:30 WIB (01:30 UTC)
-    - cron: '30 1 * * *'
+    # Berjalan 1x sehari setiap jam 00:05 WIB (17:05 UTC)
+    - cron: '5 17 * * *'
   workflow_dispatch:
 
 jobs:
