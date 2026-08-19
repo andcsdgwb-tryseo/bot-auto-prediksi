@@ -5,6 +5,8 @@ on:
     # Setel ke jam 01:00 WIB (18:00 UTC)
     - cron: '0 18 * * *'
   workflow_dispatch:
+  repository_dispatch:
+    types: [run-bot-manual]
 
 jobs:
   run-bot:
