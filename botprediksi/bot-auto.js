@@ -205,11 +205,7 @@ function sendTelegramTextMessage(textMessage) {
 // 6. HELPER CANVAS BANNER TARGET4D
 // PRESISI TEMPLATE 1024 x 1280
 // ==========================================
-async function drawGroupBanner(
-  groupDataArray,
-  templatePath,
-  tanggalFormatted
-) {
+async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   const image = await loadImage(templatePath);
 
   const canvas = createCanvas(image.width, image.height);
@@ -219,8 +215,7 @@ async function drawGroupBanner(
   ctx.drawImage(image, 0, 0, image.width, image.height);
 
   // ==========================================
-  // AUTO SCALE
-  // Acuan koordinat dibuat untuk 1024 x 1280
+  // AUTO SCALE (Skenario Acuan 1024 x 1280)
   // ==========================================
   const sx = image.width / 1024;
   const sy = image.height / 1280;
@@ -232,94 +227,79 @@ async function drawGroupBanner(
   ctx.textBaseline = 'middle';
 
   // ==========================================
-  // 1. TANGGAL
-  // Tepat di kotak hitam bawah judul
+  // 1. TANGGAL HEADER (Tepat di pita/kotak hitam)
   // ==========================================
-  ctx.font = bold ${Math.round(27 * sy)}px Arial;
+  ctx.font = `bold ${Math.round(26 * sy)}px Arial`;
   ctx.fillStyle = '#FFD700';
 
   ctx.fillText(
     tanggalFormatted || '',
-    X(475),
-    Y(140)
+    X(512), // Tepat di tengah horizontal (1024 / 2)
+    Y(118)
   );
 
   // ==========================================
-  // POSISI KOLOM
+  // POSISI KOORDINAT X (PANEL KIRI)
   // ==========================================
-
-  // Posisi X untuk panel kiri
   const LEFT = {
-    bbfs: [205, 241, 277, 313, 350],
+    // 5 Kotak Emas BBFS
+    bbfs: [225, 260, 295, 330, 365],
 
-    cm: 115,
-    cb: 231,
-    twin: 350,
+    cm: 95,
+    cb: 222,
+    twin: 342,
 
-    // Template gambar sekarang memiliki 6 kotak,
-    // tetapi bot hanya mengisi maksimal 5 angka.
-    top2d: [75, 129, 182, 236, 289],
+    // 5 Kotak Top 2D
+    top2d: [72, 142, 212, 282, 352],
 
-    // Bot mengisi maksimal 4 angka
-    top3d: [103, 158, 210, 263],
-
-    top4d: [106, 174, 242, 310]
+    // 4 Kotak Top 3D & 4D
+    top3d: [105, 177, 248, 319],
+    top4d: [105, 177, 248, 319]
   };
 
-  // Panel kanan bergeser sekitar 374 px
-  const RIGHT_SHIFT = 374;
+  // Pergeseran Horizontal Panel Kanan
+  const RIGHT_SHIFT = 370;
 
   // ==========================================
-  // POSISI Y SETIAP BARIS
+  // POSISI KOORDINAT Y (3 BARIS / ROWS)
   // ==========================================
-
   const ROWS = [
-    // BARIS 1
+    // BARIS 1 (Pasaran 1 & 2)
     {
-      bbfs: 287,
-      small: 326,
-      top2d: 384,
-      top3d: 441,
-      top4d: 498
+      bbfs: 223,
+      small: 258,
+      top2d: 313,
+      top3d: 363,
+      top4d: 413
     },
 
-    // BARIS 2
+    // BARIS 2 (Pasaran 3 & 4)
     {
-      bbfs: 612,
-      small: 652,
-      top2d: 710,
-      top3d: 768,
-      top4d: 824
+      bbfs: 518,
+      small: 553,
+      top2d: 608,
+      top3d: 658,
+      top4d: 708
     },
 
-    // BARIS 3
+    // BARIS 3 (Pasaran 5 & 6)
     {
-      bbfs: 935,
-      small: 974,
-      top2d: 1029,
-      top3d: 1078,
-      top4d: 1124
+      bbfs: 813,
+      small: 848,
+      top2d: 903,
+      top3d: 953,
+      top4d: 1003
     }
   ];
 
   // ==========================================
-  // LOOP 6 PASARAN
-  //
-  // 0 = kiri atas
-  // 1 = kanan atas
-  // 2 = kiri tengah
-  // 3 = kanan tengah
-  // 4 = kiri bawah
-  // 5 = kanan bawah
+  // LOOPING 6 PASARAN
   // ==========================================
-
   groupDataArray.slice(0, 6).forEach((item, index) => {
-
     const rowIndex = Math.floor(index / 2);
     const isRight = index % 2 === 1;
 
     const row = ROWS[rowIndex];
-
     if (!row) return;
 
     const shiftX = isRight ? RIGHT_SHIFT : 0;
@@ -331,16 +311,12 @@ async function drawGroupBanner(
 
     const details = item?.details || {};
 
-    // ========================================
     // A. BBFS 5 DIGIT
-    // ========================================
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = bold ${Math.round(19 * sy)}px Arial;
+    ctx.font = `bold ${Math.round(18 * sy)}px Arial`;
 
     bbfs.forEach((digit, i) => {
-
       const x = LEFT.bbfs[i];
-
       if (x !== undefined) {
         ctx.fillText(
           digit,
@@ -348,15 +324,11 @@ async function drawGroupBanner(
           Y(row.bbfs)
         );
       }
-
     });
 
-
-    // ========================================
-    // B. CM
-    // ========================================
+    // B. COLOK MACAU (CM)
     ctx.fillStyle = '#FFD700';
-    ctx.font = bold ${Math.round(14 * sy)}px Arial;
+    ctx.font = `bold ${Math.round(14 * sy)}px Arial`;
 
     ctx.fillText(
       String(details.cm || '-'),
@@ -364,42 +336,27 @@ async function drawGroupBanner(
       Y(row.small)
     );
 
-
-    // ========================================
-    // C. CB
-    // ========================================
+    // C. COLOK BEBAS (CB)
     ctx.fillText(
       String(details.cb || '-'),
       X(LEFT.cb + shiftX),
       Y(row.small)
     );
 
-
-    // ========================================
     // D. TWIN
-    // ========================================
     ctx.fillText(
       String(details.twin || '-'),
       X(LEFT.twin + shiftX),
       Y(row.small)
     );
 
-
-    // ========================================
-    // E. TOP 2D
-    // MAKSIMAL 5
-    // ========================================
+    // E. TOP 2D (Maksimal 5)
     ctx.fillStyle = '#00FFCC';
-    ctx.font = bold ${Math.round(15 * sy)}px Arial;
+    ctx.font = `bold ${Math.round(14 * sy)}px Arial`;
 
-    const d2 = Array.isArray(details.d2Arr)
-      ? details.d2Arr.slice(0, 5)
-      : [];
-
+    const d2 = Array.isArray(details.d2Arr) ? details.d2Arr.slice(0, 5) : [];
     d2.forEach((value, i) => {
-
       const x = LEFT.top2d[i];
-
       if (x !== undefined && value !== undefined) {
         ctx.fillText(
           String(value),
@@ -407,25 +364,15 @@ async function drawGroupBanner(
           Y(row.top2d)
         );
       }
-
     });
 
-
-    // ========================================
-    // F. TOP 3D
-    // MAKSIMAL 4
-    // ========================================
+    // F. TOP 3D (Maksimal 4)
     ctx.fillStyle = '#FFFF00';
-    ctx.font = bold ${Math.round(14 * sy)}px Arial;
+    ctx.font = `bold ${Math.round(14 * sy)}px Arial`;
 
-    const d3 = Array.isArray(details.d3Arr)
-      ? details.d3Arr.slice(0, 4)
-      : [];
-
+    const d3 = Array.isArray(details.d3Arr) ? details.d3Arr.slice(0, 4) : [];
     d3.forEach((value, i) => {
-
       const x = LEFT.top3d[i];
-
       if (x !== undefined && value !== undefined) {
         ctx.fillText(
           String(value),
@@ -433,25 +380,15 @@ async function drawGroupBanner(
           Y(row.top3d)
         );
       }
-
     });
 
-
-    // ========================================
-    // G. TOP 4D
-    // MAKSIMAL 4
-    // ========================================
+    // G. TOP 4D (Maksimal 4)
     ctx.fillStyle = '#FF5555';
-    ctx.font = bold ${Math.round(13 * sy)}px Arial;
+    ctx.font = `bold ${Math.round(14 * sy)}px Arial`;
 
-    const d4 = Array.isArray(details.d4Arr)
-      ? details.d4Arr.slice(0, 4)
-      : [];
-
+    const d4 = Array.isArray(details.d4Arr) ? details.d4Arr.slice(0, 4) : [];
     d4.forEach((value, i) => {
-
       const x = LEFT.top4d[i];
-
       if (x !== undefined && value !== undefined) {
         ctx.fillText(
           String(value),
@@ -459,16 +396,9 @@ async function drawGroupBanner(
           Y(row.top4d)
         );
       }
-
     });
-
   });
 
-
-  // ==========================================
-  // OUTPUT
-  // PNG disarankan agar tulisan lebih tajam
-  // ==========================================
   return canvas.toBuffer('image/png');
 }
 
