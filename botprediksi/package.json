@@ -1,0 +1,8 @@
+{
+  "name": "bot-prediksi",
+  "version": "1.0.0",
+  "main": "bot-auto.js",
+  "dependencies": {
+    "firebase-admin": "^11.11.1"
+  }
+}
