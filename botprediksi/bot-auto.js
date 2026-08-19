@@ -19,6 +19,13 @@ const DAFTAR_PASARAN = [
   "TOTOMACAU22", "TOTOMACAU23"
 ];
 
+// Pemetaan Hari Libur (0 = Minggu, 1 = Senin, 2 = Selasa, 3 = Rabu, 4 = Kamis, 5 = Jumat, 6 = Sabtu)
+const JADWAL_OFF = {
+  "SINGAPORE": [2, 5], // Libur Selasa (2) & Jumat (5)
+  "TAIPEI": [1]        // Libur Senin (1)
+  // Pasaran lain yang tidak terdaftar otomatis BUKA setiap hari
+};
+
 const DAFTAR_SHIO = [
   "Tikus", "Kerbau", "Harimau", "Kelinci", "Naga", "Ular", 
   "Kuda", "Kambing", "Monyet", "Ayam", "Anjing", "Babi"
@@ -29,6 +36,14 @@ function getTodayWIB() {
   const options = { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' };
   const formatter = new Intl.DateTimeFormat('en-CA', options);
   return formatter.format(new Date());
+}
+
+// Helper: Ambil Angka Hari Saat Ini Berdasarkan Zona WIB (0 = Minggu, 1 = Senin, dst)
+function getDayOfWeekWIB() {
+  const options = { timeZone: 'Asia/Jakarta', weekday: 'short' };
+  const dayStr = new Intl.DateTimeFormat('en-US', options).format(new Date());
+  const daysMap = { 'Sun': 0, 'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6 };
+  return daysMap[dayStr];
 }
 
 // Helper: Acak Angka 5 Digit Unik (BBFS)
@@ -46,8 +61,6 @@ function generateBBFS() {
 // Helper: Ambil Kombinasi Digit Secara Acak Tanpa Duplikat
 function getRandomDigitCombo(bbfsArr, digitLength, count) {
   const results = new Set();
-  
-  // Lakukan pencarian pola acak sampai memenuhi kuota jumlah kombinasi (count)
   let attempts = 0;
   while (results.size < count && attempts < 50) {
     attempts++;
@@ -55,7 +68,6 @@ function getRandomDigitCombo(bbfsArr, digitLength, count) {
     const combo = shuffled.slice(0, digitLength).join('');
     results.add(combo);
   }
-  
   return Array.from(results).join('*');
 }
 
@@ -63,20 +75,14 @@ function getRandomDigitCombo(bbfsArr, digitLength, count) {
 function generatePredictionDetails(bbfsStr) {
   const arr = bbfsStr.split('');
   
-  // Colok Bebas (1 Digit dari BBFS)
   const cb = arr[0];
-  
-  // Colok Macau (2 Digit dari BBFS)
   const cm = `${arr[0]} / ${arr[1]}`;
-  
-  // Shio & Twin Random
   const shio = DAFTAR_SHIO[Math.floor(Math.random() * DAFTAR_SHIO.length)];
   const twin = `${arr[0]}${arr[0]}*${arr[1]}${arr[1]}`;
   
-  // Kombinasi 2D, 3D, dan 4D (Masing-masing dibuat 5 Kombinasi Unik)
   const d2 = `${arr[0]}${arr[1]}*${arr[1]}${arr[2]}*${arr[2]}${arr[3]}*${arr[3]}${arr[4]}*${arr[0]}${arr[4]}`;
-  const d3 = getRandomDigitCombo(arr, 3, 5); // 5 Kombinasi 3D (Contoh: "138*384*849*491*139")
-  const d4 = getRandomDigitCombo(arr, 4, 5); // 5 Kombinasi 4D (Contoh: "1384*3849*8491*4913*1394")
+  const d3 = getRandomDigitCombo(arr, 3, 5);
+  const d4 = getRandomDigitCombo(arr, 4, 5);
 
   return { cb, cm, shio, twin, d2, d3, d4 };
 }
@@ -84,7 +90,9 @@ function generatePredictionDetails(bbfsStr) {
 // LOGIKA UTAMA BOT
 async function runBot() {
   const tanggalWIB = getTodayWIB();
-  console.log(`[BOT] Memulai pengerjaan otomatis 18 pasaran untuk tanggal: ${tanggalWIB}`);
+  const currentDayWIB = getDayOfWeekWIB(); // Dapatkan hari saat ini (0-6)
+
+  console.log(`[BOT] Memulai pengerjaan otomatis pasaran untuk tanggal: ${tanggalWIB} (Hari ke-${currentDayWIB})`);
 
   try {
     // 1. Cek Aktivasi Bot (Di-OFF-kan / ON-kan via Admin)
@@ -96,13 +104,20 @@ async function runBot() {
 
     const batch = db.batch();
     const prediksiRef = db.collection('prediksi');
+    let totalGenerated = 0;
 
-    // 2. Loop & Generate Data untuk 18 Pasaran
+    // 2. Loop & Generate Data untuk Pasaran yang Buka
     for (const pasaran of DAFTAR_PASARAN) {
+      // Cek apakah pasaran libur/off hari ini
+      const daysOff = JADWAL_OFF[pasaran] || [];
+      if (daysOff.includes(currentDayWIB)) {
+        console.log(`[BOT] ⏸️ Pasaran ${pasaran} LIBUR hari ini. Dilewati.`);
+        continue;
+      }
+
       const bbfs = generateBBFS();
       const details = generatePredictionDetails(bbfs);
 
-      // Struktur Data Firestore
       const payload = {
         pasaran: pasaran,
         tanggal: tanggalWIB,
@@ -120,16 +135,20 @@ async function runBot() {
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
-      // Simpan menggunakan ID gabungan (contoh: "2026-08-20_HONGKONG")
       const docId = `${tanggalWIB}_${pasaran.replace(/\s+/g, '')}`;
       const docRef = prediksiRef.doc(docId);
       
       batch.set(docRef, payload, { merge: true });
+      totalGenerated++;
     }
 
-    // 3. Commit Semua 18 Pasaran ke Firestore Secara Bersamaan
-    await batch.commit();
-    console.log(`[BOT] ✅ BERHASIL! 18 Pasaran tanggal ${tanggalWIB} telah diterbitkan ke collection 'prediksi'.`);
+    // 3. Commit Semua Pasaran yang Buka ke Firestore
+    if (totalGenerated > 0) {
+      await batch.commit();
+      console.log(`[BOT] ✅ BERHASIL! ${totalGenerated} Pasaran (buka) tanggal ${tanggalWIB} telah diterbitkan.`);
+    } else {
+      console.log(`[BOT] ⚠️ Tidak ada pasaran yang diterbitkan (semua libur).`);
+    }
 
   } catch (error) {
     console.error("[BOT] ❌ Terjadi kesalahan saat memproses bot:", error);
