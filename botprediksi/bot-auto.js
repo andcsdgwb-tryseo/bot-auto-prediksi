@@ -1,4 +1,5 @@
 const admin = require('firebase-admin');
+const https = require('https');
 
 // 1. INISIALISASI FIREBASE ADMIN SDK
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -10,6 +11,10 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
+
+// 2. KONFIGURASI TELEGRAM BOT
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 // Daftar 18 Pasaran Togel Sesuai Option HTML Admin Anda
 const DAFTAR_PASARAN = [
@@ -23,7 +28,6 @@ const DAFTAR_PASARAN = [
 const JADWAL_OFF = {
   "SINGAPORE": [2, 5], // Libur Selasa (2) & Jumat (5)
   "TAIPEI": [1]        // Libur Senin (1)
-  // Pasaran lain yang tidak terdaftar otomatis BUKA setiap hari
 };
 
 const DAFTAR_SHIO = [
@@ -87,10 +91,64 @@ function generatePredictionDetails(bbfsStr) {
   return { cb, cm, shio, twin, d2, d3, d4 };
 }
 
+// Helper: Kirim Pesan ke API Telegram
+function sendTelegramMessage(text) {
+  return new Promise((resolve, reject) => {
+    if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
+      console.log("[TELEGRAM] ⚠️ Token atau Chat ID tidak ditemukan. Skip pengiriman Telegram.");
+      return resolve(null);
+    }
+
+    const payload = JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text: text,
+      parse_mode: 'HTML'
+    });
+
+    const options = {
+      hostname: 'api.telegram.org',
+      path: `/bot${TELEGRAM_TOKEN}/sendMessage`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => resolve(body));
+    });
+
+    req.on('error', (error) => reject(error));
+    req.write(payload);
+    req.end();
+  });
+}
+
+// Helper: Format Tampilan Pesan Telegram
+function formatTelegramMessage(pasaran, tanggal, bbfs, details) {
+  return `🔥 <b>PREDIKSI ${pasaran}</b> 🔥
+📅 Tanggal: <code>${tanggal}</code>
+----------------------------------
+🎯 <b>BBFS:</b> <code>${bbfs}</code>
+🎯 <b>Colok Bebas:</b> <code>${details.cb}</code>
+🎯 <b>Colok Macau:</b> <code>${details.cm}</code>
+🎯 <b>Shio:</b> ${details.shio}
+🎯 <b>Twin:</b> <code>${details.twin}</code>
+----------------------------------
+🎲 <b>2D:</b> <code>${details.d2}</code>
+🎲 <b>3D:</b> <code>${details.d3}</code>
+🎲 <b>4D:</b> <code>${details.d4}</code>
+----------------------------------
+✅ <i>Prediksi Otomatis Diterbitkan!</i>`;
+}
+
 // LOGIKA UTAMA BOT
 async function runBot() {
   const tanggalWIB = getTodayWIB();
-  const currentDayWIB = getDayOfWeekWIB(); // Dapatkan hari saat ini (0-6)
+  const currentDayWIB = getDayOfWeekWIB();
 
   console.log(`[BOT] Memulai pengerjaan otomatis pasaran untuk tanggal: ${tanggalWIB} (Hari ke-${currentDayWIB})`);
 
@@ -118,6 +176,7 @@ async function runBot() {
       const bbfs = generateBBFS();
       const details = generatePredictionDetails(bbfs);
 
+      // Simpan ke Firestore Payload
       const payload = {
         pasaran: pasaran,
         tanggal: tanggalWIB,
@@ -140,12 +199,21 @@ async function runBot() {
       
       batch.set(docRef, payload, { merge: true });
       totalGenerated++;
+
+      // Kirim Notifikasi per Pasaran ke Telegram
+      try {
+        const telegramText = formatTelegramMessage(pasaran, tanggalWIB, bbfs, details);
+        await sendTelegramMessage(telegramText);
+        console.log(`[TELEGRAM] ✅ Berhasil kirim ${pasaran}`);
+      } catch (tgErr) {
+        console.error(`[TELEGRAM] ❌ Gagal kirim ${pasaran}:`, tgErr.message);
+      }
     }
 
     // 3. Commit Semua Pasaran yang Buka ke Firestore
     if (totalGenerated > 0) {
       await batch.commit();
-      console.log(`[BOT] ✅ BERHASIL! ${totalGenerated} Pasaran (buka) tanggal ${tanggalWIB} telah diterbitkan.`);
+      console.log(`[BOT] ✅ BERHASIL! ${totalGenerated} Pasaran (buka) tanggal ${tanggalWIB} telah diterbitkan ke Firestore & Telegram.`);
     } else {
       console.log(`[BOT] ⚠️ Tidak ada pasaran yang diterbitkan (semua libur).`);
     }
