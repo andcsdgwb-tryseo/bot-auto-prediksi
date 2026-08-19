@@ -1,8 +1,10 @@
 {
-  "name": "bot-prediksi",
+  "name": "bot-auto-prediksi",
   "version": "1.0.0",
   "main": "bot-auto.js",
   "dependencies": {
-    "firebase-admin": "^11.11.1"
+    "canvas": "^2.11.2",
+    "firebase-admin": "^11.11.1",
+    "form-data": "^4.0.0"
   }
 }
