@@ -47,7 +47,7 @@ const MAP_NAMA_DISPLAY = {
 // Grouping Pasaran
 const KELOMPOK_MACAU      = ["TOTOMACAU 13", "TOTOMACAU 16", "TOTOMACAU 19", "TOTOMACAU 22", "TOTOMACAU 23", "TOTOMACAU 00"];
 const KELOMPOK_PASARAN_1 = ["SINGAPORE", "MALAYSIA", "MACAU", "BUSANNIGHT", "QATAR", "HKSIANG"];
-const KELOMPOK_PASARAN_2 = ["SINGAPORE", "MALAYSIA", "MACAU", "BUSANNIGHT", "QATAR", "HONGKONG"];
+const KELOMPOK_PASARAN_2 = ["TOTOWUHAN", "HKSIANG", "SYDNEY4D", "TAIPEI", "SGMETRO", "BUSANDAY"];
 
 // Jadwal Operasional
 const JADWAL_JAM = {
@@ -79,16 +79,6 @@ const JADWAL_OFF = {
 const DAFTAR_SHIO = [
   "Tikus", "Kerbau", "Harimau", "Kelinci", "Naga", "Ular", 
   "Kuda", "Kambing", "Monyet", "Ayam", "Anjing", "Babi"
-];
-
-// Koordinat Box Grid 2x3
-const BOX_POSITIONS = [
-  { x: 50,  y: 180 }, 
-  { x: 420, y: 180 }, 
-  { x: 50,  y: 520 }, 
-  { x: 420, y: 520 }, 
-  { x: 50,  y: 860 }, 
-  { x: 420, y: 860 }  
 ];
 
 // ==========================================
@@ -219,35 +209,78 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   const canvas = createCanvas(image.width, image.height);
   const ctx = canvas.getContext('2d');
 
+  // Draw Template Image
   ctx.drawImage(image, 0, 0, image.width, image.height);
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 24px Arial';
+  // Draw Tanggal di Kotak Atas
+  ctx.font = 'bold 22px "Arial", sans-serif';
+  ctx.fillStyle = '#FFD700'; // Warna Emas
   ctx.textAlign = 'center';
-  ctx.fillText(tanggalFormatted, image.width / 2, 85);
+  ctx.fillText(tanggalFormatted, 440, 105);
 
-  ctx.textAlign = 'left';
+  // Koordinat Grid 6 Box Pasaran (2 Kolom x 3 Baris)
+  const gridPositions = [
+    { x: 42,  y: 158 },
+    { x: 405, y: 158 },
+    { x: 42,  y: 402 },
+    { x: 405, y: 402 },
+    { x: 42,  y: 646 },
+    { x: 405, y: 646 }
+  ];
+
   groupDataArray.forEach((item, index) => {
-    if (index >= 6) return;
-    const pos = BOX_POSITIONS[index];
+    if (index >= gridPositions.length) return;
+    const pos = gridPositions[index];
     const { bbfs, details } = item;
 
+    ctx.textAlign = 'center';
+
+    // 1. BBFS 5 DIGIT (Masuk ke 5 Kotak Emas BBFS)
+    ctx.font = 'bold 15px "Arial", sans-serif';
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 12px Arial';
-    ctx.fillText(`BBFS 5 Digit : ${bbfs}`, pos.x + 10, pos.y + 40);
-    ctx.fillText(`CM : ${details.cm}   CB : ${details.cb}   TWIN : ${details.twin}`, pos.x + 10, pos.y + 60);
+    const bbfsDigits = String(bbfs || '').replace(/\D/g, '').slice(0, 5).split('');
+    const bbfsX = [190, 222, 254, 286, 318];
+    bbfsDigits.forEach((digit, i) => {
+      if (bbfsX[i]) {
+        ctx.fillText(digit, pos.x + bbfsX[i], pos.y + 57);
+      }
+    });
 
+    // 2. CM, CB, TWIN
+    ctx.font = 'bold 13px "Arial", sans-serif';
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText(details.cm || '-', pos.x + 83, pos.y + 88);
+    ctx.fillText(details.cb || '-', pos.x + 185, pos.y + 88);
+    ctx.fillText(details.twin || '-', pos.x + 298, pos.y + 88);
+
+    // 3. TOP 2D (5 Kotak)
+    ctx.font = 'bold 13px "Arial", sans-serif';
     ctx.fillStyle = '#00FFCC';
-    ctx.fillText(`TOP 2D :`, pos.x + 10, pos.y + 85);
-    ctx.fillText(details.d2Arr.slice(0, 6).join('  '), pos.x + 75, pos.y + 85);
+    const boxX5 = [60, 122, 185, 247, 309];
+    for (let i = 0; i < 5; i++) {
+      if (details.d2Arr && details.d2Arr[i]) {
+        ctx.fillText(details.d2Arr[i], pos.x + boxX5[i], pos.y + 133);
+      }
+    }
 
-    ctx.fillStyle = '#FFCC00';
-    ctx.fillText(`TOP 3D :`, pos.x + 10, pos.y + 110);
-    ctx.fillText(details.d3Arr.slice(0, 5).join('  '), pos.x + 75, pos.y + 110);
+    // 4. TOP 3D (4 Kotak)
+    ctx.font = 'bold 13px "Arial", sans-serif';
+    ctx.fillStyle = '#FFFF00';
+    const boxX4 = [91, 153, 216, 278];
+    for (let i = 0; i < 4; i++) {
+      if (details.d3Arr && details.d3Arr[i]) {
+        ctx.fillText(details.d3Arr[i], pos.x + boxX4[i], pos.y + 175);
+      }
+    }
 
-    ctx.fillStyle = '#FF6666';
-    ctx.fillText(`TOP 4D :`, pos.x + 10, pos.y + 135);
-    ctx.fillText(details.d4Arr.slice(0, 4).join('  '), pos.x + 75, pos.y + 135);
+    // 5. TOP 4D (4 Kotak)
+    ctx.font = 'bold 13px "Arial", sans-serif';
+    ctx.fillStyle = '#FF5555';
+    for (let i = 0; i < 4; i++) {
+      if (details.d4Arr && details.d4Arr[i]) {
+        ctx.fillText(details.d4Arr[i], pos.x + boxX4[i], pos.y + 217);
+      }
+    }
   });
 
   return canvas.toBuffer('image/jpeg');
@@ -258,7 +291,6 @@ function sendTelegramBannerPhoto(photoBuffer, captionText) {
     if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return resolve(null);
 
     const form = new FormData();
-    // Tautan Disesuaikan dengan URL Terbaru
     const replyMarkup = {
       inline_keyboard: [
         [{ text: "🛡️ LINK UTAMA TARGET4D", url: "https://t4dtop.com/1" }],
@@ -273,7 +305,6 @@ function sendTelegramBannerPhoto(photoBuffer, captionText) {
 
     form.append('chat_id', TELEGRAM_CHAT_ID);
     
-    // Topic PREDIKSI GAMBAR TOGEL (27)
     if (TELEGRAM_TOPIC_GAMBAR_ID) {
       form.append('message_thread_id', TELEGRAM_TOPIC_GAMBAR_ID);
     }
@@ -302,7 +333,7 @@ function sendTelegramBannerPhoto(photoBuffer, captionText) {
 }
 
 // ==========================================
-// 7. EKSKUSI UTAMA (MAIN BOT FUNCTION)
+// 7. EKSEKUSI UTAMA (MAIN BOT FUNCTION)
 // ==========================================
 async function runBot() {
   const tanggalWIB = getTodayWIB();
