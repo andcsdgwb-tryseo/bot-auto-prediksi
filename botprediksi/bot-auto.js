@@ -202,89 +202,274 @@ function sendTelegramTextMessage(textMessage) {
 }
 
 // ==========================================
-// 6. HELPER CANVAS BANNER & KOORDINAT PRESISI Target4D
+// 6. HELPER CANVAS BANNER TARGET4D
+// PRESISI TEMPLATE 1024 x 1280
 // ==========================================
-async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
+async function drawGroupBanner(
+  groupDataArray,
+  templatePath,
+  tanggalFormatted
+) {
   const image = await loadImage(templatePath);
+
   const canvas = createCanvas(image.width, image.height);
   const ctx = canvas.getContext('2d');
 
-  // Draw Template Image
+  // Gambar template
   ctx.drawImage(image, 0, 0, image.width, image.height);
 
-  // 1. TANGGAL HEADER ATAS (Disesuaikan di tengah pita hitam)
-  ctx.font = 'bold 26px "Arial", sans-serif';
-  ctx.fillStyle = '#FFD700'; // Warna Emas
-  ctx.textAlign = 'center';
-  ctx.fillText(tanggalFormatted, image.width * 0.43, 115);
+  // ==========================================
+  // AUTO SCALE
+  // Acuan koordinat dibuat untuk 1024 x 1280
+  // ==========================================
+  const sx = image.width / 1024;
+  const sy = image.height / 1280;
 
-  // 2. GRID KOORDINAT 6 PASARAN (2 Kolom x 3 Baris)
-  // Presisi Sesuai Template Target4D
-  const gridPositions = [
-    { x: 25,  y: 195 }, // Row 1 Left
-    { x: 395, y: 195 }, // Row 1 Right
-    { x: 25,  y: 490 }, // Row 2 Left
-    { x: 395, y: 490 }, // Row 2 Right
-    { x: 25,  y: 785 }, // Row 3 Left
-    { x: 395, y: 785 }  // Row 3 Right
+  const X = (v) => v * sx;
+  const Y = (v) => v * sy;
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // ==========================================
+  // 1. TANGGAL
+  // Tepat di kotak hitam bawah judul
+  // ==========================================
+  ctx.font = bold ${Math.round(27 * sy)}px Arial;
+  ctx.fillStyle = '#FFD700';
+
+  ctx.fillText(
+    tanggalFormatted || '',
+    X(475),
+    Y(140)
+  );
+
+  // ==========================================
+  // POSISI KOLOM
+  // ==========================================
+
+  // Posisi X untuk panel kiri
+  const LEFT = {
+    bbfs: [205, 241, 277, 313, 350],
+
+    cm: 115,
+    cb: 231,
+    twin: 350,
+
+    // Template gambar sekarang memiliki 6 kotak,
+    // tetapi bot hanya mengisi maksimal 5 angka.
+    top2d: [75, 129, 182, 236, 289],
+
+    // Bot mengisi maksimal 4 angka
+    top3d: [103, 158, 210, 263],
+
+    top4d: [106, 174, 242, 310]
+  };
+
+  // Panel kanan bergeser sekitar 374 px
+  const RIGHT_SHIFT = 374;
+
+  // ==========================================
+  // POSISI Y SETIAP BARIS
+  // ==========================================
+
+  const ROWS = [
+    // BARIS 1
+    {
+      bbfs: 287,
+      small: 326,
+      top2d: 384,
+      top3d: 441,
+      top4d: 498
+    },
+
+    // BARIS 2
+    {
+      bbfs: 612,
+      small: 652,
+      top2d: 710,
+      top3d: 768,
+      top4d: 824
+    },
+
+    // BARIS 3
+    {
+      bbfs: 935,
+      small: 974,
+      top2d: 1029,
+      top3d: 1078,
+      top4d: 1124
+    }
   ];
 
-  groupDataArray.forEach((item, index) => {
-    if (index >= gridPositions.length) return;
-    const pos = gridPositions[index];
-    const { bbfs, details } = item;
+  // ==========================================
+  // LOOP 6 PASARAN
+  //
+  // 0 = kiri atas
+  // 1 = kanan atas
+  // 2 = kiri tengah
+  // 3 = kanan tengah
+  // 4 = kiri bawah
+  // 5 = kanan bawah
+  // ==========================================
 
-    ctx.textAlign = 'center';
+  groupDataArray.slice(0, 6).forEach((item, index) => {
 
-    // A. BBFS 5 DIGIT (Masuk Presisi ke 5 Kotak Emas)
-    ctx.font = 'bold 18px "Arial", sans-serif';
+    const rowIndex = Math.floor(index / 2);
+    const isRight = index % 2 === 1;
+
+    const row = ROWS[rowIndex];
+
+    if (!row) return;
+
+    const shiftX = isRight ? RIGHT_SHIFT : 0;
+
+    const bbfs = String(item?.bbfs || '')
+      .replace(/\D/g, '')
+      .slice(0, 5)
+      .split('');
+
+    const details = item?.details || {};
+
+    // ========================================
+    // A. BBFS 5 DIGIT
+    // ========================================
     ctx.fillStyle = '#FFFFFF';
-    const bbfsDigits = String(bbfs || '').replace(/\D/g, '').slice(0, 5).split('');
-    const bbfsX = [225, 260, 295, 330, 365];
-    bbfsDigits.forEach((digit, i) => {
-      if (bbfsX[i]) {
-        ctx.fillText(digit, pos.x + bbfsX[i], pos.y + 28);
+    ctx.font = bold ${Math.round(19 * sy)}px Arial;
+
+    bbfs.forEach((digit, i) => {
+
+      const x = LEFT.bbfs[i];
+
+      if (x !== undefined) {
+        ctx.fillText(
+          digit,
+          X(x + shiftX),
+          Y(row.bbfs)
+        );
       }
+
     });
 
-    // B. CM, CB, TWIN
-    ctx.font = 'bold 14px "Arial", sans-serif';
+
+    // ========================================
+    // B. CM
+    // ========================================
     ctx.fillStyle = '#FFD700';
-    ctx.fillText(details.cm || '-', pos.x + 95, pos.y + 63);   // Kotak CM
-    ctx.fillText(details.cb || '-', pos.x + 222, pos.y + 63);  // Kotak CB
-    ctx.fillText(details.twin || '-', pos.x + 342, pos.y + 63); // Kotak TWIN
+    ctx.font = bold ${Math.round(14 * sy)}px Arial;
 
-    // C. TOP 2D (5 Kotak Tosca)
-    ctx.font = 'bold 14px "Arial", sans-serif';
+    ctx.fillText(
+      String(details.cm || '-'),
+      X(LEFT.cm + shiftX),
+      Y(row.small)
+    );
+
+
+    // ========================================
+    // C. CB
+    // ========================================
+    ctx.fillText(
+      String(details.cb || '-'),
+      X(LEFT.cb + shiftX),
+      Y(row.small)
+    );
+
+
+    // ========================================
+    // D. TWIN
+    // ========================================
+    ctx.fillText(
+      String(details.twin || '-'),
+      X(LEFT.twin + shiftX),
+      Y(row.small)
+    );
+
+
+    // ========================================
+    // E. TOP 2D
+    // MAKSIMAL 5
+    // ========================================
     ctx.fillStyle = '#00FFCC';
-    const box2dX = [72, 142, 212, 282, 352];
-    for (let i = 0; i < 5; i++) {
-      if (details.d2Arr && details.d2Arr[i]) {
-        ctx.fillText(details.d2Arr[i], pos.x + box2dX[i], pos.y + 118);
-      }
-    }
+    ctx.font = bold ${Math.round(15 * sy)}px Arial;
 
-    // D. TOP 3D (4 Kotak Kuning)
-    ctx.font = 'bold 14px "Arial", sans-serif';
+    const d2 = Array.isArray(details.d2Arr)
+      ? details.d2Arr.slice(0, 5)
+      : [];
+
+    d2.forEach((value, i) => {
+
+      const x = LEFT.top2d[i];
+
+      if (x !== undefined && value !== undefined) {
+        ctx.fillText(
+          String(value),
+          X(x + shiftX),
+          Y(row.top2d)
+        );
+      }
+
+    });
+
+
+    // ========================================
+    // F. TOP 3D
+    // MAKSIMAL 4
+    // ========================================
     ctx.fillStyle = '#FFFF00';
-    const box3dX = [105, 177, 248, 319];
-    for (let i = 0; i < 4; i++) {
-      if (details.d3Arr && details.d3Arr[i]) {
-        ctx.fillText(details.d3Arr[i], pos.x + box3dX[i], pos.y + 168);
-      }
-    }
+    ctx.font = bold ${Math.round(14 * sy)}px Arial;
 
-    // E. TOP 4D (4 Kotak Merah)
-    ctx.font = 'bold 14px "Arial", sans-serif';
-    ctx.fillStyle = '#FF5555';
-    for (let i = 0; i < 4; i++) {
-      if (details.d4Arr && details.d4Arr[i]) {
-        ctx.fillText(details.d4Arr[i], pos.x + box3dX[i], pos.y + 218);
+    const d3 = Array.isArray(details.d3Arr)
+      ? details.d3Arr.slice(0, 4)
+      : [];
+
+    d3.forEach((value, i) => {
+
+      const x = LEFT.top3d[i];
+
+      if (x !== undefined && value !== undefined) {
+        ctx.fillText(
+          String(value),
+          X(x + shiftX),
+          Y(row.top3d)
+        );
       }
-    }
+
+    });
+
+
+    // ========================================
+    // G. TOP 4D
+    // MAKSIMAL 4
+    // ========================================
+    ctx.fillStyle = '#FF5555';
+    ctx.font = bold ${Math.round(13 * sy)}px Arial;
+
+    const d4 = Array.isArray(details.d4Arr)
+      ? details.d4Arr.slice(0, 4)
+      : [];
+
+    d4.forEach((value, i) => {
+
+      const x = LEFT.top4d[i];
+
+      if (x !== undefined && value !== undefined) {
+        ctx.fillText(
+          String(value),
+          X(x + shiftX),
+          Y(row.top4d)
+        );
+      }
+
+    });
+
   });
 
-  return canvas.toBuffer('image/jpeg');
+
+  // ==========================================
+  // OUTPUT
+  // PNG disarankan agar tulisan lebih tajam
+  // ==========================================
+  return canvas.toBuffer('image/png');
 }
 
 function sendTelegramBannerPhoto(photoBuffer, captionText) {
