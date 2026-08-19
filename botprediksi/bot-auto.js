@@ -1,6 +1,5 @@
 const admin = require('firebase-admin');
 const https = require('https');
-const path = require('path');
 const { createCanvas, loadImage } = require('canvas');
 const FormData = require('form-data');
 
@@ -25,17 +24,17 @@ const TELEGRAM_CHAT_ID         = process.env.TELEGRAM_CHAT_ID || "-1004474947415
 const TELEGRAM_TOPIC_GAMBAR_ID = process.env.TELEGRAM_TOPIC_GAMBAR_ID || 27; // Topic: PREDIKSI GAMBAR TOGEL
 const TELEGRAM_TOPIC_TEXT_ID   = process.env.TELEGRAM_TOPIC_TEXT_ID || 29;   // Topic: ANGKO PREDIKSI
 
-// Daftar Pasaran Utama (Total 18 Pasaran)
+// Daftar Total 18 Pasaran
 const DAFTAR_PASARAN = [
-  "TOTOWUHAN", "HKSIANG", "SGMETRO", "SYDNEY4D", "TAIPEI", "BUSANDAY",
-  "SINGAPORE", "MALAYSIA", "QATAR", "MACAU", "BUSANNIGHT", "HONGKONG",
-  "TOTOMACAU 00", "TOTOMACAU 13", "TOTOMACAU 16", "TOTOMACAU 19", 
-  "TOTOMACAU 22", "TOTOMACAU 23"
+  "TOTOWUHAN", "HKSIANG", "SYDNEY4D", "TAIPEI", "SGMETRO", "BUSANDAY",
+  "SINGAPORE", "MALAYSIA", "MACAU", "BUSANNIGHT", "QATAR", "HONGKONG",
+  "TOTOMACAU 13", "TOTOMACAU 16", "TOTOMACAU 19", "TOTOMACAU 22", 
+  "TOTOMACAU 23", "TOTOMACAU 00"
 ];
 
-// Pemeta Nama Tampilan Khusus Teks Telegram
+// Pemeta Nama Tampilan Teks Telegram
 const MAP_NAMA_DISPLAY = {
-  "HKSIANG":      "HONGKONG DAY",
+  "HKSIANG":      "HONGKONG SIANG",
   "TOTOMACAU 00": "TOTO MACAU 0000",
   "TOTOMACAU 13": "TOTO MACAU 1300",
   "TOTOMACAU 16": "TOTO MACAU 1600",
@@ -44,24 +43,24 @@ const MAP_NAMA_DISPLAY = {
   "TOTOMACAU 23": "TOTO MACAU 2300"
 };
 
-// Pembagian Grouping 3 Banner (Masing-masing 6 Pasaran)
+// Pembagian Grouping 3 Banner (6 Pasaran per Banner)
 const KELOMPOK_MACAU      = ["TOTOMACAU 13", "TOTOMACAU 16", "TOTOMACAU 19", "TOTOMACAU 22", "TOTOMACAU 23", "TOTOMACAU 00"];
-const KELOMPOK_PASARAN_1 = ["SINGAPORE", "MALAYSIA", "QATAR", "MACAU", "BUSANNIGHT", "HONGKONG"];
-const KELOMPOK_PASARAN_2 = ["TOTOWUHAN", "HKSIANG", "SGMETRO", "SYDNEY4D", "TAIPEI", "BUSANDAY"];
+const KELOMPOK_PASARAN_1 = ["SINGAPORE", "MALAYSIA", "MACAU", "BUSANNIGHT", "QATAR", "HONGKONG"];
+const KELOMPOK_PASARAN_2 = ["TOTOWUHAN", "HKSIANG", "SYDNEY4D", "TAIPEI", "SGMETRO", "BUSANDAY"];
 
 // Jadwal Operasional
 const JADWAL_JAM = {
   "TOTOWUHAN":    { tutup: "10:00 WIB", result: "10:30 WIB" },
   "HKSIANG":      { tutup: "10:30 WIB", result: "11:00 WIB" },
-  "SGMETRO":      { tutup: "11:30 WIB", result: "12:00 WIB" },
   "SYDNEY4D":     { tutup: "13:35 WIB", result: "14:00 WIB" },
   "TAIPEI":       { tutup: "14:30 WIB", result: "15:00 WIB" },
+  "SGMETRO":      { tutup: "11:30 WIB", result: "12:00 WIB" },
   "BUSANDAY":     { tutup: "15:00 WIB", result: "15:30 WIB" },
   "SINGAPORE":    { tutup: "17:35 WIB", result: "17:45 WIB" },
   "MALAYSIA":     { tutup: "18:30 WIB", result: "19:00 WIB" },
-  "QATAR":        { tutup: "20:00 WIB", result: "20:30 WIB" },
   "MACAU":        { tutup: "21:00 WIB", result: "21:30 WIB" },
   "BUSANNIGHT":   { tutup: "21:30 WIB", result: "22:00 WIB" },
+  "QATAR":        { tutup: "20:00 WIB", result: "20:30 WIB" },
   "HONGKONG":     { tutup: "22:45 WIB", result: "23:00 WIB" },
   "TOTOMACAU 00": { tutup: "23:45 WIB", result: "00:00 WIB" },
   "TOTOMACAU 13": { tutup: "12:45 WIB", result: "13:00 WIB" },
@@ -72,8 +71,8 @@ const JADWAL_JAM = {
 };
 
 const JADWAL_OFF = {
-  "SINGAPORE": [2, 5], 
-  "TAIPEI": [1]        
+  "SINGAPORE": [2, 5], // Libur Selasa & Jumat
+  "TAIPEI": [1]        // Libur Senin
 };
 
 const DAFTAR_SHIO = [
@@ -82,7 +81,7 @@ const DAFTAR_SHIO = [
 ];
 
 // ==========================================
-// 3. HELPER DATE & TIME
+// 3. HELPER DATE & TIME (WIB)
 // ==========================================
 function getTodayWIB() {
   const options = { timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit' };
@@ -133,9 +132,9 @@ function generatePredictionDetails(bbfsStr) {
   
   const d2Arr = [
     `${arr[0]}${arr[1]}`, `${arr[1]}${arr[2]}`, `${arr[2]}${arr[3]}`, 
-    `${arr[3]}${arr[4]}`, `${arr[0]}${arr[4]}`, `${arr[1]}${arr[3]}`
+    `${arr[3]}${arr[4]}`, `${arr[0]}${arr[4]}`
   ];
-  const d3Arr = getRandomDigitComboArr(arr, 3, 5);
+  const d3Arr = getRandomDigitComboArr(arr, 3, 4);
   const d4Arr = getRandomDigitComboArr(arr, 4, 4);
 
   return { 
@@ -148,7 +147,7 @@ function generatePredictionDetails(bbfsStr) {
 }
 
 // ==========================================
-// 5. HELPER FORMAT & KIRIM TEKS KE TOPIC "ANGKO PREDIKSI" (ID: 29)
+// 5. HELPER FORMAT & KIRIM TEKS TOPIC 29
 // ==========================================
 function formatTelegramMessage(pasaran, tanggal, bbfs, details) {
   const namaTampil = MAP_NAMA_DISPLAY[pasaran] || pasaran;
@@ -202,8 +201,7 @@ function sendTelegramTextMessage(textMessage) {
 }
 
 // ==========================================
-// 6. HELPER CANVAS BANNER TARGET4D
-// PRESISI TEMPLATE 1024 x 1280
+// 6. HELPER CANVAS BANNER TARGET4D (PRESISI)
 // ==========================================
 async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   const image = await loadImage(templatePath);
@@ -211,12 +209,10 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   const canvas = createCanvas(image.width, image.height);
   const ctx = canvas.getContext('2d');
 
-  // Gambar template
+  // Gambar Gambar Dasar
   ctx.drawImage(image, 0, 0, image.width, image.height);
 
-  // ==========================================
-  // AUTO SCALE (Skenario Acuan 1024 x 1280)
-  // ==========================================
+  // Auto Scale (Acuan Skala 1024 x 1280)
   const sx = image.width / 1024;
   const sy = image.height / 1280;
 
@@ -226,75 +222,32 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // ==========================================
-  // 1. TANGGAL HEADER (Tepat di pita/kotak hitam)
-  // ==========================================
-  ctx.font = `bold ${Math.round(26 * sy)}px Arial`;
+  // 1. TANGGAL HEADER ATAS
+  ctx.font = `bold ${Math.round(22 * sy)}px Arial`;
   ctx.fillStyle = '#FFD700';
+  ctx.fillText(tanggalFormatted || '', X(435), Y(105));
 
-  ctx.fillText(
-    tanggalFormatted || '',
-    X(512), // Tepat di tengah horizontal (1024 / 2)
-    Y(118)
-  );
+  // KOORDINAT BASE (PANEL KIRI)
+  const RIGHT_SHIFT = 385;
 
-  // ==========================================
-  // POSISI KOORDINAT X (PANEL KIRI)
-  // ==========================================
   const LEFT = {
-    // 5 Kotak Emas BBFS
-    bbfs: [225, 260, 295, 330, 365],
-
-    cm: 95,
-    cb: 222,
-    twin: 342,
-
-    // 5 Kotak Top 2D
-    top2d: [72, 142, 212, 282, 352],
-
-    // 4 Kotak Top 3D & 4D
-    top3d: [105, 177, 248, 319],
-    top4d: [105, 177, 248, 319]
+    bbfs: [180, 218, 255, 292, 330],
+    cm: 80,
+    cb: 185,
+    twin: 295,
+    top2d: [62, 128, 194, 260, 326],
+    top3d: [95, 161, 227, 293],
+    top4d: [95, 161, 227, 293]
   };
 
-  // Pergeseran Horizontal Panel Kanan
-  const RIGHT_SHIFT = 370;
-
-  // ==========================================
-  // POSISI KOORDINAT Y (3 BARIS / ROWS)
-  // ==========================================
+  // KOORDINAT VERTIKAL (3 BARIS PASARAN)
   const ROWS = [
-    // BARIS 1 (Pasaran 1 & 2)
-    {
-      bbfs: 223,
-      small: 258,
-      top2d: 313,
-      top3d: 363,
-      top4d: 413
-    },
-
-    // BARIS 2 (Pasaran 3 & 4)
-    {
-      bbfs: 518,
-      small: 553,
-      top2d: 608,
-      top3d: 658,
-      top4d: 708
-    },
-
-    // BARIS 3 (Pasaran 5 & 6)
-    {
-      bbfs: 813,
-      small: 848,
-      top2d: 903,
-      top3d: 953,
-      top4d: 1003
-    }
+    { bbfs: 220, small: 252, top2d: 298, top3d: 340, top4d: 382 },
+    { bbfs: 476, small: 508, top2d: 554, top3d: 596, top4d: 638 },
+    { bbfs: 732, small: 764, top2d: 810, top3d: 852, top4d: 894 }
   ];
 
-  // ==========================================
-  // LOOPING 6 PASARAN
-  // ==========================================
+  // LOOPING DATA 6 PASARAN
   groupDataArray.slice(0, 6).forEach((item, index) => {
     const rowIndex = Math.floor(index / 2);
     const isRight = index % 2 === 1;
@@ -303,98 +256,52 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
     if (!row) return;
 
     const shiftX = isRight ? RIGHT_SHIFT : 0;
-
-    const bbfs = String(item?.bbfs || '')
-      .replace(/\D/g, '')
-      .slice(0, 5)
-      .split('');
-
+    const bbfs = String(item?.bbfs || '').replace(/\D/g, '').slice(0, 5).split('');
     const details = item?.details || {};
 
     // A. BBFS 5 DIGIT
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = `bold ${Math.round(18 * sy)}px Arial`;
-
+    ctx.font = `bold ${Math.round(15 * sy)}px Arial`;
     bbfs.forEach((digit, i) => {
-      const x = LEFT.bbfs[i];
-      if (x !== undefined) {
-        ctx.fillText(
-          digit,
-          X(x + shiftX),
-          Y(row.bbfs)
-        );
+      if (LEFT.bbfs[i] !== undefined) {
+        ctx.fillText(digit, X(LEFT.bbfs[i] + shiftX), Y(row.bbfs));
       }
     });
 
-    // B. COLOK MACAU (CM)
+    // B. CM, CB, TWIN
     ctx.fillStyle = '#FFD700';
-    ctx.font = `bold ${Math.round(14 * sy)}px Arial`;
+    ctx.font = `bold ${Math.round(13 * sy)}px Arial`;
+    ctx.fillText(String(details.cm || '-'), X(LEFT.cm + shiftX), Y(row.small));
+    ctx.fillText(String(details.cb || '-'), X(LEFT.cb + shiftX), Y(row.small));
+    ctx.fillText(String(details.twin || '-'), X(LEFT.twin + shiftX), Y(row.small));
 
-    ctx.fillText(
-      String(details.cm || '-'),
-      X(LEFT.cm + shiftX),
-      Y(row.small)
-    );
-
-    // C. COLOK BEBAS (CB)
-    ctx.fillText(
-      String(details.cb || '-'),
-      X(LEFT.cb + shiftX),
-      Y(row.small)
-    );
-
-    // D. TWIN
-    ctx.fillText(
-      String(details.twin || '-'),
-      X(LEFT.twin + shiftX),
-      Y(row.small)
-    );
-
-    // E. TOP 2D (Maksimal 5)
+    // C. TOP 2D
     ctx.fillStyle = '#00FFCC';
-    ctx.font = `bold ${Math.round(14 * sy)}px Arial`;
-
+    ctx.font = `bold ${Math.round(13 * sy)}px Arial`;
     const d2 = Array.isArray(details.d2Arr) ? details.d2Arr.slice(0, 5) : [];
     d2.forEach((value, i) => {
-      const x = LEFT.top2d[i];
-      if (x !== undefined && value !== undefined) {
-        ctx.fillText(
-          String(value),
-          X(x + shiftX),
-          Y(row.top2d)
-        );
+      if (LEFT.top2d[i] !== undefined && value !== undefined) {
+        ctx.fillText(String(value), X(LEFT.top2d[i] + shiftX), Y(row.top2d));
       }
     });
 
-    // F. TOP 3D (Maksimal 4)
+    // D. TOP 3D
     ctx.fillStyle = '#FFFF00';
-    ctx.font = `bold ${Math.round(14 * sy)}px Arial`;
-
+    ctx.font = `bold ${Math.round(13 * sy)}px Arial`;
     const d3 = Array.isArray(details.d3Arr) ? details.d3Arr.slice(0, 4) : [];
     d3.forEach((value, i) => {
-      const x = LEFT.top3d[i];
-      if (x !== undefined && value !== undefined) {
-        ctx.fillText(
-          String(value),
-          X(x + shiftX),
-          Y(row.top3d)
-        );
+      if (LEFT.top3d[i] !== undefined && value !== undefined) {
+        ctx.fillText(String(value), X(LEFT.top3d[i] + shiftX), Y(row.top3d));
       }
     });
 
-    // G. TOP 4D (Maksimal 4)
+    // E. TOP 4D
     ctx.fillStyle = '#FF5555';
-    ctx.font = `bold ${Math.round(14 * sy)}px Arial`;
-
+    ctx.font = `bold ${Math.round(12 * sy)}px Arial`;
     const d4 = Array.isArray(details.d4Arr) ? details.d4Arr.slice(0, 4) : [];
     d4.forEach((value, i) => {
-      const x = LEFT.top4d[i];
-      if (x !== undefined && value !== undefined) {
-        ctx.fillText(
-          String(value),
-          X(x + shiftX),
-          Y(row.top4d)
-        );
+      if (LEFT.top4d[i] !== undefined && value !== undefined) {
+        ctx.fillText(String(value), X(LEFT.top4d[i] + shiftX), Y(row.top4d));
       }
     });
   });
@@ -425,7 +332,7 @@ function sendTelegramBannerPhoto(photoBuffer, captionText) {
       form.append('message_thread_id', TELEGRAM_TOPIC_GAMBAR_ID);
     }
 
-    form.append('photo', photoBuffer, { filename: 'prediksi-banner.jpg' });
+    form.append('photo', photoBuffer, { filename: 'prediksi-banner.png' });
     form.append('caption', captionText);
     form.append('parse_mode', 'HTML');
     form.append('reply_markup', JSON.stringify(replyMarkup));
@@ -511,7 +418,7 @@ async function runBot() {
         console.log(`[BOT] ⏸️ Pasaran ${pasaran} LIBUR hari ini.`);
       }
 
-      // 2. Kelompokkan Data untuk Gambar Banner (Tetap diisi dummy agar gambar 6 box lengkap)
+      // 2. Kelompokkan Data untuk 3 Banner Gambar
       const itemData = { pasaran, bbfs: isLibur ? "LIBUR" : bbfs, details };
       if (KELOMPOK_MACAU.includes(pasaran)) macauGroupData.push(itemData);
       if (KELOMPOK_PASARAN_1.includes(pasaran)) group1Data.push(itemData);
@@ -520,7 +427,7 @@ async function runBot() {
 
     await batch.commit();
     console.log(`[BOT] ✅ Firestore berhasil diperbarui.`);
-    console.log(`[TELEGRAM] ✅ Semua teks prediksi terkirim ke Topic ID 29 (ANGKO PREDIKSI).`);
+    console.log(`[TELEGRAM] ✅ Semua teks prediksi terkirim ke Topic ID 29.`);
 
     const captionBase = `🎯 <b>PREDIKSI TOGEL ${tanggalFormatted}</b> 🎯\n\n` +
                         `🔥 <b>Angka pilihan hari ini sudah siap!</b>\n` +
@@ -528,7 +435,7 @@ async function runBot() {
                         `⚡ Prediksi tajam, pilihan terbaik, dan jadwal lengkap berbagai pasaran.\n\n` +
                         `✨ Cek angka pilihanmu dan tetap bermain secara bijak.`;
 
-    // 3. Render & Kirim 3 Gambar Banner ke Topic "PREDIKSI GAMBAR TOGEL" (Topic 27)
+    // 3. Render & Kirim 3 Banner ke Topic "PREDIKSI GAMBAR TOGEL" (Topic 27)
     if (macauGroupData.length > 0) {
       const buffer = await drawGroupBanner(macauGroupData, './template-totomacau.jpg', tanggalFormatted);
       await sendTelegramBannerPhoto(buffer, captionBase);
