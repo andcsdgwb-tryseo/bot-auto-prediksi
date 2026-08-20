@@ -237,7 +237,7 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   // Gambar latar template dasar
   ctx.drawImage(image, 0, 0, image.width, image.height);
 
-  // Skala responsif terhadap canvas asli
+  // Skala responsif terhadap canvas asli (1024x1280)
   const sx = image.width / 1024;
   const sy = image.height / 1280;
 
@@ -247,30 +247,33 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // 1. TANGGAL HEADER (Kotak Hitam Atas)
+  // 1. TANGGAL HEADER (Di Kotak Hitam Atas)
   ctx.font = `bold ${Math.round(20 * sy)}px Arial, sans-serif`;
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(tanggalFormatted || '', X(438), Y(125));
+  ctx.fillText(tanggalFormatted || '', X(438), Y(102));
 
-  // Jarak antar kolom (Kiri ke Kanan)
+  // Jarak Horisontal Panel Kiri ke Panel Kanan (SINGAPORE -> MALAYSIA)
   const RIGHT_SHIFT = 373;
 
-  // POSISI HORIZONTAL (X) PRESISI KIRI
+  // KOORDINAT HORIZONTAL (X) PANEL KIRI
   const LEFT = {
-    bbfs: [210, 235, 260, 285, 310], // 5 Digit BBFS
-    cm: 80,                          // Angka CM
-    cb: 185,                         // Angka CB
-    twin: 295,                       // Angka TWIN
-    top2d: [65, 126, 187, 248, 309], // 5 Pasang Angka TOP 2D
-    top3d: [80, 151, 222, 293],      // 4 Pasang Angka TOP 3D
-    top4d: [80, 151, 222, 293]       // 4 Pasang Angka TOP 4D
+    bbfs: [215, 238, 261, 284, 307], // 5 Digit BBFS (Pas di samping "BBFS 5 Digit:")
+    cm: 88,                          // Angka CM (Di samping "CM :")
+    cb: 198,                         // Angka CB (Di samping "CB :")
+    twin: 308,                       // Angka TWIN (Di samping "TWIN :")
+    top2d: [62, 124, 186, 248, 310], // 5 Pasang Angka TOP 2D
+    top3d: [78, 150, 222, 294],      // 4 Pasang Angka TOP 3D
+    top4d: [78, 150, 222, 294]       // 4 Pasang Angka TOP 4D
   };
 
-  // TITIK AWAL Y KOTAK PANELS
+  // KOORDINAT VERTIKAL (Y) TIAP BARIS PASARAN
   const ROWS = [
-    { bbfs: 216, small: 247, top2d: 288, top3d: 334, top4d: 379 }, // Baris 1
-    { bbfs: 512, small: 543, top2d: 584, top3d: 630, top4d: 675 }, // Baris 2
-    { bbfs: 808, small: 839, top2d: 880, top3d: 926, top4d: 971 }  // Baris 3
+    // Baris 1: SINGAPORE / MALAYSIA
+    { bbfs: 220, small: 254, top2d: 302, top3d: 356, top4d: 410 },
+    // Baris 2: MACAU / BUSAN NIGHT
+    { bbfs: 478, small: 512, top2d: 560, top3d: 614, top4d: 668 },
+    // Baris 3: QATAR / HONGKONG
+    { bbfs: 736, small: 770, top2d: 818, top3d: 872, top4d: 926 }
   ];
 
   groupDataArray.slice(0, 6).forEach((item, index) => {
@@ -294,25 +297,25 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
 
     const bbfs = String(item?.bbfs || '').replace(/\D/g, '').slice(0, 5).split('');
 
-    // A. BBFS 5 DIGIT
+    // A. BBFS 5 DIGIT (Putih Tajam)
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = `bold ${Math.round(16 * sy)}px Arial, sans-serif`;
+    ctx.font = `bold ${Math.round(15 * sy)}px Arial, sans-serif`;
     bbfs.forEach((digit, i) => {
       if (LEFT.bbfs[i] !== undefined) {
         ctx.fillText(digit, X(LEFT.bbfs[i] + shiftX), Y(row.bbfs));
       }
     });
 
-    // B. CM, CB, TWIN
-    ctx.fillStyle = '#FFE600';
-    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
+    // B. CM, CB, TWIN (Kuning Mas)
+    ctx.fillStyle = '#FFD700';
+    ctx.font = `bold ${Math.round(13 * sy)}px Arial, sans-serif`;
     ctx.fillText(String(details.cm || '-'), X(LEFT.cm + shiftX), Y(row.small));
     ctx.fillText(String(details.cb || '-'), X(LEFT.cb + shiftX), Y(row.small));
     ctx.fillText(String(details.twin || '-'), X(LEFT.twin + shiftX), Y(row.small));
 
-    // C. TOP 2D
+    // C. TOP 2D (Cyan / Hijau Tosca)
     ctx.fillStyle = '#00FFCC';
-    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
+    ctx.font = `bold ${Math.round(13 * sy)}px Arial, sans-serif`;
     const d2 = Array.isArray(details.d2Arr) ? details.d2Arr.slice(0, 5) : [];
     d2.forEach((value, i) => {
       if (LEFT.top2d[i] !== undefined && value !== undefined) {
@@ -320,9 +323,9 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
       }
     });
 
-    // D. TOP 3D
+    // D. TOP 3D (Kuning Neon)
     ctx.fillStyle = '#FFFF00';
-    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
+    ctx.font = `bold ${Math.round(13 * sy)}px Arial, sans-serif`;
     const d3 = Array.isArray(details.d3Arr) ? details.d3Arr.slice(0, 4) : [];
     d3.forEach((value, i) => {
       if (LEFT.top3d[i] !== undefined && value !== undefined) {
@@ -330,9 +333,9 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
       }
     });
 
-    // E. TOP 4D
+    // E. TOP 4D (Merah Muda / Coral)
     ctx.fillStyle = '#FF77AA';
-    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
+    ctx.font = `bold ${Math.round(13 * sy)}px Arial, sans-serif`;
     const d4 = Array.isArray(details.d4Arr) ? details.d4Arr.slice(0, 4) : [];
     d4.forEach((value, i) => {
       if (LEFT.top4d[i] !== undefined && value !== undefined) {
