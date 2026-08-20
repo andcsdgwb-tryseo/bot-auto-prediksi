@@ -24,7 +24,9 @@ const TELEGRAM_CHAT_ID         = process.env.TELEGRAM_CHAT_ID || "-1004474947415
 const TELEGRAM_TOPIC_GAMBAR_ID = process.env.TELEGRAM_TOPIC_GAMBAR_ID || 27; // Topic: PREDIKSI GAMBAR TOGEL
 const TELEGRAM_TOPIC_TEXT_ID   = process.env.TELEGRAM_TOPIC_TEXT_ID || 29;   // Topic: ANGKO PREDIKSI
 
-// Daftar Total 18 Pasaran
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Daftar 18 Pasaran
 const DAFTAR_PASARAN = [
   "TOTOWUHAN", "HKSIANG", "SYDNEY4D", "TAIPEI", "SGMETRO", "BUSANDAY",
   "SINGAPORE", "MALAYSIA", "MACAU", "BUSANNIGHT", "QATAR", "HONGKONG",
@@ -32,7 +34,6 @@ const DAFTAR_PASARAN = [
   "TOTOMACAU 23", "TOTOMACAU 00"
 ];
 
-// Pemeta Nama Tampilan Teks
 const MAP_NAMA_DISPLAY = {
   "HKSIANG":      "HONGKONG SIANG",
   "TOTOMACAU 00": "TOTO MACAU 0000",
@@ -43,12 +44,11 @@ const MAP_NAMA_DISPLAY = {
   "TOTOMACAU 23": "TOTO MACAU 2300"
 };
 
-// Pembagian Grouping 3 Banner (6 Pasaran per Banner)
+// Kelompok Pasaran
 const KELOMPOK_PASARAN_1 = ["SINGAPORE", "MALAYSIA", "MACAU", "BUSANNIGHT", "QATAR", "HONGKONG"];
-const KELOMPOK_PASARAN_2 = ["TOTOWUHAN", "HKSIANG", "HONGKONG SIANG", "SYDNEY4D", "TAIPEI", "SGMETRO", "BUSANDAY"];
+const KELOMPOK_PASARAN_2 = ["TOTOWUHAN", "HKSIANG", "SYDNEY4D", "TAIPEI", "SGMETRO", "BUSANDAY"];
 const KELOMPOK_MACAU      = ["TOTOMACAU 13", "TOTOMACAU 16", "TOTOMACAU 19", "TOTOMACAU 22", "TOTOMACAU 23", "TOTOMACAU 00"];
 
-// Jadwal Operasional
 const JADWAL_JAM = {
   "TOTOWUHAN":    { tutup: "10:00 WIB", result: "10:30 WIB" },
   "HKSIANG":      { tutup: "10:30 WIB", result: "11:00 WIB" },
@@ -71,8 +71,8 @@ const JADWAL_JAM = {
 };
 
 const JADWAL_OFF = {
-  "SINGAPORE": [2, 5], // Libur Selasa & Jumat
-  "TAIPEI": [1]        // Libur Senin
+  "SINGAPORE": [2, 5], 
+  "TAIPEI": [1]        
 };
 
 const DAFTAR_SHIO = [
@@ -164,7 +164,7 @@ function formatTelegramMessage(pasaran, tanggal, bbfs, details) {
          `🎲 <b>3D:</b> <code>${details.d3}</code>\n` +
          `🎲 <b>4D:</b> <code>${details.d4}</code>\n` +
          `----------------------------------\n` +
-         `✅ <i>Prediksi Telah Diterbitkan!</i>`;
+         `✅ <i>Prediksi Otomatis Diterbitkan!</i>`;
 }
 
 function sendTelegramTextMessage(textMessage) {
@@ -201,7 +201,7 @@ function sendTelegramTextMessage(textMessage) {
 }
 
 // ==========================================
-// 6. HELPER CANVAS BANNER TARGET4D (PRESISI)
+// 6. CANVAS RENDERER DENGAN KOORDINAT PRESISI
 // ==========================================
 async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   const image = await loadImage(templatePath);
@@ -211,7 +211,6 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
 
   ctx.drawImage(image, 0, 0, image.width, image.height);
 
-  // Auto Scale (Acuan Skala 1024 x 1280)
   const sx = image.width / 1024;
   const sy = image.height / 1280;
 
@@ -221,32 +220,31 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // 1. TANGGAL HEADER ATAS (Tepat di pita hitam)
-  ctx.font = `bold ${Math.round(22 * sy)}px Arial`;
+  // TANGGAL HEADER ATAS
+  ctx.font = `bold ${Math.round(20 * sy)}px Arial`;
   ctx.fillStyle = '#FFD700';
-  ctx.fillText(tanggalFormatted || '', X(435), Y(105));
+  ctx.fillText(tanggalFormatted || '', X(438), Y(106));
 
-  // KOORDINAT BASE (PANEL KIRI)
-  const RIGHT_SHIFT = 385;
+  const RIGHT_SHIFT = 385; // Jarak Geser Panel Kiri ke Panel Kanan
 
+  // KOORDINAT HORIZONTAL SISI KIRI (TITIK TENGAH SETIAP KOTAK)
   const LEFT = {
-    bbfs: [180, 218, 255, 292, 330],
-    cm: 80,
-    cb: 185,
-    twin: 295,
-    top2d: [62, 128, 194, 260, 326],
-    top3d: [95, 161, 227, 293],
-    top4d: [95, 161, 227, 293]
+    bbfs: [208, 238, 268, 298, 328], // Kotak BBFS 5 Digit
+    cm: 92,                          // Kotak Colok Macau
+    cb: 202,                         // Kotak Colok Bebas
+    twin: 308,                       // Kotak Twin
+    top2d: [64, 126, 188, 250, 312],  // Kotak TOP 2D (5 Kotak Tosca)
+    top3d: [80, 148, 216, 284],      // Kotak TOP 3D (4 Kotak Kuning)
+    top4d: [80, 148, 216, 284]       // Kotak TOP 4D (4 Kotak Merah)
   };
 
-  // KOORDINAT VERTIKAL AKURAT (3 BARIS PASARAN)
+  // KOORDINAT VERTIKAL BARIS (3 BARIS PER BANNER)
   const ROWS = [
     { bbfs: 220, small: 252, top2d: 298, top3d: 340, top4d: 382 },
     { bbfs: 476, small: 508, top2d: 554, top3d: 596, top4d: 638 },
     { bbfs: 732, small: 764, top2d: 810, top3d: 852, top4d: 894 }
   ];
 
-  // LOOPING DATA 6 PASARAN
   groupDataArray.slice(0, 6).forEach((item, index) => {
     const rowIndex = Math.floor(index / 2);
     const isRight = index % 2 === 1;
@@ -258,25 +256,25 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
     const bbfs = String(item?.bbfs || '').replace(/\D/g, '').slice(0, 5).split('');
     const details = item?.details || {};
 
-    // A. BBFS 5 DIGIT
+    // 1. BBFS (5 KOTAK EMAS)
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = `bold ${Math.round(15 * sy)}px Arial`;
+    ctx.font = `bold ${Math.round(14 * sy)}px Arial`;
     bbfs.forEach((digit, i) => {
       if (LEFT.bbfs[i] !== undefined) {
         ctx.fillText(digit, X(LEFT.bbfs[i] + shiftX), Y(row.bbfs));
       }
     });
 
-    // B. CM, CB, TWIN
+    // 2. CM, CB, TWIN
     ctx.fillStyle = '#FFD700';
-    ctx.font = `bold ${Math.round(13 * sy)}px Arial`;
+    ctx.font = `bold ${Math.round(12 * sy)}px Arial`;
     ctx.fillText(String(details.cm || '-'), X(LEFT.cm + shiftX), Y(row.small));
     ctx.fillText(String(details.cb || '-'), X(LEFT.cb + shiftX), Y(row.small));
     ctx.fillText(String(details.twin || '-'), X(LEFT.twin + shiftX), Y(row.small));
 
-    // C. TOP 2D
+    // 3. TOP 2D (5 KOTAK TOSCA)
     ctx.fillStyle = '#00FFCC';
-    ctx.font = `bold ${Math.round(13 * sy)}px Arial`;
+    ctx.font = `bold ${Math.round(12 * sy)}px Arial`;
     const d2 = Array.isArray(details.d2Arr) ? details.d2Arr.slice(0, 5) : [];
     d2.forEach((value, i) => {
       if (LEFT.top2d[i] !== undefined && value !== undefined) {
@@ -284,9 +282,9 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
       }
     });
 
-    // D. TOP 3D
+    // 4. TOP 3D (4 KOTAK KUNING)
     ctx.fillStyle = '#FFFF00';
-    ctx.font = `bold ${Math.round(13 * sy)}px Arial`;
+    ctx.font = `bold ${Math.round(12 * sy)}px Arial`;
     const d3 = Array.isArray(details.d3Arr) ? details.d3Arr.slice(0, 4) : [];
     d3.forEach((value, i) => {
       if (LEFT.top3d[i] !== undefined && value !== undefined) {
@@ -294,9 +292,9 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
       }
     });
 
-    // E. TOP 4D
+    // 5. TOP 4D (4 KOTAK MERAH)
     ctx.fillStyle = '#FF5555';
-    ctx.font = `bold ${Math.round(12 * sy)}px Arial`;
+    ctx.font = `bold ${Math.round(11 * sy)}px Arial`;
     const d4 = Array.isArray(details.d4Arr) ? details.d4Arr.slice(0, 4) : [];
     d4.forEach((value, i) => {
       if (LEFT.top4d[i] !== undefined && value !== undefined) {
@@ -326,7 +324,6 @@ function sendTelegramBannerPhoto(photoBuffer, captionText) {
     };
 
     form.append('chat_id', TELEGRAM_CHAT_ID);
-    
     if (TELEGRAM_TOPIC_GAMBAR_ID) {
       form.append('message_thread_id', TELEGRAM_TOPIC_GAMBAR_ID);
     }
@@ -378,8 +375,12 @@ async function runBot() {
     const group2Data = [];
     const macauGroupData = [];
 
-    // Helper Pencocokan Fleksibel
-    const isMatch = (arr, val) => arr.map(x => x.replace(/\s+/g, '').toUpperCase()).includes(val.replace(/\s+/g, '').toUpperCase());
+    // Helper Pencocokan Fleksibel String
+    const normalize = (str) => String(str || '').replace(/\s+/g, '').toUpperCase();
+
+    const normG1 = KELOMPOK_PASARAN_1.map(normalize);
+    const normG2 = KELOMPOK_PASARAN_2.map(normalize);
+    const normMacau = KELOMPOK_MACAU.map(normalize);
 
     for (const pasaran of DAFTAR_PASARAN) {
       const daysOff = JADWAL_OFF[pasaran] || [];
@@ -412,21 +413,27 @@ async function runBot() {
         const docId = `${tanggalWIB}_${pasaran.replace(/\s+/g, '')}`;
         batch.set(prediksiRef.doc(docId), payload, { merge: true });
 
-        // Send Text to Topic 29
+        // Kirim Teks Prediksi ke Topic ID 29
         const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, bbfs, details);
         await sendTelegramTextMessage(textMsg);
       }
 
       const itemData = { pasaran, bbfs: isLibur ? "LIBUR" : bbfs, details };
 
-      if (isMatch(KELOMPOK_PASARAN_1, pasaran)) group1Data.push(itemData);
-      if (isMatch(KELOMPOK_PASARAN_2, pasaran)) group2Data.push(itemData);
-      if (isMatch(KELOMPOK_MACAU, pasaran)) macauGroupData.push(itemData);
+      const normP = normalize(pasaran);
+
+      if (normMacau.includes(normP)) {
+        macauGroupData.push(itemData);
+      } else if (normG1.includes(normP)) {
+        group1Data.push(itemData);
+      } else if (normG2.includes(normP)) {
+        group2Data.push(itemData);
+      }
     }
 
     await batch.commit();
-    console.log(`[BOT] ✅ Firestore & Teks Topic 29 Selesai.`);
-    console.log(`[DIAGNOSTIK] Banner 1: ${group1Data.length} data | Banner 2: ${group2Data.length} data | Banner Macau: ${macauGroupData.length} data`);
+    console.log(`[BOT] ✅ Firestore & Teks Topic 29 selesai.`);
+    console.log(`[DIAGNOSTIK] Banner 1: ${group1Data.length} | Banner 2: ${group2Data.length} | Banner Macau: ${macauGroupData.length}`);
 
     const captionBase = `🎯 <b>PREDIKSI TOGEL ${tanggalFormatted}</b> 🎯\n\n` +
                         `🔥 <b>Angka pilihan hari ini sudah siap!</b>\n` +
@@ -434,23 +441,22 @@ async function runBot() {
                         `⚡ Prediksi tajam, pilihan terbaik, dan jadwal lengkap berbagai pasaran.\n\n` +
                         `✨ Cek angka pilihanmu dan tetap bermain secara bijak.`;
 
-    // RENDER & SEND 3 BANNERS KE TOPIC 27
-    
-    // BANNER 1
+    // 3. RENDER & SEND 3 BANNER KE TOPIC 27 DENGAN JEDA (DELAY)
+
     if (group1Data.length > 0) {
       const buffer1 = await drawGroupBanner(group1Data, './template-pasaran-1.jpg', tanggalFormatted);
       await sendTelegramBannerPhoto(buffer1, captionBase);
       console.log(`[TELEGRAM] ✅ Banner Pasaran 1 terkirim ke Topic ID 27.`);
+      await delay(2500);
     }
 
-    // BANNER 2
     if (group2Data.length > 0) {
       const buffer2 = await drawGroupBanner(group2Data, './template-pasaran-2.jpg', tanggalFormatted);
       await sendTelegramBannerPhoto(buffer2, captionBase);
       console.log(`[TELEGRAM] ✅ Banner Pasaran 2 terkirim ke Topic ID 27.`);
+      await delay(2500);
     }
 
-    // BANNER 3 (MACAU)
     if (macauGroupData.length > 0) {
       const buffer3 = await drawGroupBanner(macauGroupData, './template-totomacau.jpg', tanggalFormatted);
       await sendTelegramBannerPhoto(buffer3, captionBase);
