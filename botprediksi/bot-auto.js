@@ -219,20 +219,24 @@ function sendTelegramTextMessage(textMessage) {
 }
 
 // ==========================================
-// ==========================================
-// 6. CANVAS RENDERER PRESISI & FONT JELAS
+// 6. CANVAS RENDERER PRESISI & JELAS (FIXED)
 // ==========================================
 async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   const fullPath = path.resolve(templatePath);
+  
+  if (!fs.existsSync(fullPath)) {
+    throw new Error(`File template tidak ditemukan di: ${fullPath}`);
+  }
+
   const image = await loadImage(fullPath);
 
   const canvas = createCanvas(image.width, image.height);
   const ctx = canvas.getContext('2d');
 
-  // Gambar background template
+  // Gambar latar template dasar
   ctx.drawImage(image, 0, 0, image.width, image.height);
 
-  // Skala responsif terhadap ukuran gambar asli
+  // Skala responsif terhadap canvas asli
   const sx = image.width / 1024;
   const sy = image.height / 1280;
 
@@ -242,111 +246,97 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // 1. TANGGAL HEADER (Kotak Hitam Kosong Atas)
-  ctx.font = `bold ${Math.round(22 * sy)}px Arial, sans-serif`;
+  // 1. TANGGAL HEADER (Kotak Hitam Atas)
+  ctx.font = `bold ${Math.round(20 * sy)}px Arial, sans-serif`;
   ctx.fillStyle = '#FFFFFF';
   ctx.fillText(tanggalFormatted || '', X(438), Y(125));
 
-  // Jarak Antara Panel Kiri ke Panel Kanan
+  // Jarak antar kolom (Kiri ke Kanan)
   const RIGHT_SHIFT = 373;
 
-  // POSISI HORIZONTAL (X)
+  // POSISI HORIZONTAL (X) PRESISI KIRI
   const LEFT = {
-    bbfs: [215, 243, 271, 299, 327],  // 5 Digit Angka BBFS
-    cm: 95,                           // Sebelah kanan CM :
-    cb: 220,                          // Sebelah kanan CB :
-    twin: 325,                        // Sebelah kanan TWIN :
-    top2d: [65, 126, 187, 248, 309],  // 5 Pasang Angka TOP 2D
-    top3d: [80, 151, 222, 293],       // 4 Pasang Angka TOP 3D
-    top4d: [80, 151, 222, 293]        // 4 Pasang Angka TOP 4D
+    bbfs: [210, 235, 260, 285, 310], // 5 Digit BBFS (Sebelah kanan "BBFS 5 Digit:")
+    cm: 80,                          // Angka CM (Di bawah / kanan label CM:)
+    cb: 185,                         // Angka CB (Di bawah / kanan label CB:)
+    twin: 295,                       // Angka TWIN (Di bawah / kanan label TWIN:)
+    top2d: [65, 126, 187, 248, 309], // 5 Pasang Angka TOP 2D
+    top3d: [80, 151, 222, 293],      // 4 Pasang Angka TOP 3D
+    top4d: [80, 151, 222, 293]       // 4 Pasang Angka TOP 4D
   };
 
-  // BOX TOPS (Tingkat Atas Masing-Masing Baris Panel)
-  // Baris 1: Singapore / Malaysia (Top: 152)
-  // Baris 2: Macau / Busan Night (Top: 522)
-  // Baris 3: Qatar / Hongkong (Top: 892)
-  const BOX_TOPS = [152, 522, 892];
-
-  // OFFSET RELATIF DIDALAM KOTAK (Berlaku Sama untuk Semua Baris)
-  const OFFSET = {
-    bbfs: 122,      // Posisi BBFS 5 Digit
-    small: 170,     // Posisi CM, CB, TWIN
-    top2d: 218,     // Posisi Garis TOP 2D
-    top3d: 268,     // Posisi Garis TOP 3D
-    top4d: 318      // Posisi Garis TOP 4D
-  };
+  // TITIK AWAL Y KOTAK PANELS (SINGAPORE/MACAU/QATAR)
+  // Baris 1 Top = 215, Baris 2 Top = 512, Baris 3 Top = 808
+  const ROWS = [
+    { bbfs: 216, small: 247, top2d: 288, top3d: 334, top4d: 379 }, // Baris 1: SINGAPORE / MALAYSIA
+    { bbfs: 512, small: 543, top2d: 584, top3d: 630, top4d: 675 }, // Baris 2: MACAU / BUSAN NIGHT
+    { bbfs: 808, small: 839, top2d: 880, top3d: 926, top4d: 971 }  // Baris 3: QATAR / HONGKONG
+  ];
 
   groupDataArray.slice(0, 6).forEach((item, index) => {
     const rowIndex = Math.floor(index / 2);
     const isRight = index % 2 === 1;
 
-    const boxTop = BOX_TOPS[rowIndex];
-    if (boxTop === undefined) return;
+    const row = ROWS[rowIndex];
+    if (!row) return;
 
     const shiftX = isRight ? RIGHT_SHIFT : 0;
     const isLibur = item?.bbfs === "LIBUR";
     const details = item?.details || {};
 
-    // Perhitungan Y Presisi berdasarkan Offset
-    const yBBFS  = boxTop + OFFSET.bbfs;
-    const ySmall = boxTop + OFFSET.small;
-    const y2D    = boxTop + OFFSET.top2d;
-    const y3D    = boxTop + OFFSET.top3d;
-    const y4D    = boxTop + OFFSET.top4d;
-
-    // KONDISI PASARAN LIBUR
+    // STATUS LIBUR
     if (isLibur) {
       ctx.fillStyle = '#FF3333';
       ctx.font = `bold ${Math.round(24 * sy)}px Arial, sans-serif`;
-      ctx.fillText("PASARAN LIBUR", X(188 + shiftX), Y(y2D));
+      ctx.fillText("PASARAN LIBUR", X(188 + shiftX), Y(row.top2d));
       return;
     }
 
     const bbfs = String(item?.bbfs || '').replace(/\D/g, '').slice(0, 5).split('');
 
-    // A. BBFS 5 DIGIT (Putih Bening & Tebal)
+    // A. BBFS 5 DIGIT (Warna Putih - Font Jelas)
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = `bold ${Math.round(17 * sy)}px Arial, sans-serif`;
+    ctx.font = `bold ${Math.round(16 * sy)}px Arial, sans-serif`;
     bbfs.forEach((digit, i) => {
       if (LEFT.bbfs[i] !== undefined) {
-        ctx.fillText(digit, X(LEFT.bbfs[i] + shiftX), Y(yBBFS));
+        ctx.fillText(digit, X(LEFT.bbfs[i] + shiftX), Y(row.bbfs));
       }
     });
 
     // B. CM, CB, TWIN (Kuning Mas Terang)
     ctx.fillStyle = '#FFE600';
-    ctx.font = `bold ${Math.round(15 * sy)}px Arial, sans-serif`;
-    ctx.fillText(String(details.cm || '-'), X(LEFT.cm + shiftX), Y(ySmall));
-    ctx.fillText(String(details.cb || '-'), X(LEFT.cb + shiftX), Y(ySmall));
-    ctx.fillText(String(details.twin || '-'), X(LEFT.twin + shiftX), Y(ySmall));
+    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
+    ctx.fillText(String(details.cm || '-'), X(LEFT.cm + shiftX), Y(row.small));
+    ctx.fillText(String(details.cb || '-'), X(LEFT.cb + shiftX), Y(row.small));
+    ctx.fillText(String(details.twin || '-'), X(LEFT.twin + shiftX), Y(row.small));
 
-    // C. TOP 2D (Hijau Cyan Terang - Font Diperbesar)
+    // C. TOP 2D (Cyan Terang - Tepat di Garis 2D)
     ctx.fillStyle = '#00FFCC';
-    ctx.font = `bold ${Math.round(15 * sy)}px Arial, sans-serif`;
+    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
     const d2 = Array.isArray(details.d2Arr) ? details.d2Arr.slice(0, 5) : [];
     d2.forEach((value, i) => {
       if (LEFT.top2d[i] !== undefined && value !== undefined) {
-        ctx.fillText(String(value), X(LEFT.top2d[i] + shiftX), Y(y2D));
+        ctx.fillText(String(value), X(LEFT.top2d[i] + shiftX), Y(row.top2d));
       }
     });
 
-    // D. TOP 3D (Kuning Terang - Font Diperbesar)
+    // D. TOP 3D (Kuning Neon - Tepat di Garis 3D)
     ctx.fillStyle = '#FFFF00';
-    ctx.font = `bold ${Math.round(15 * sy)}px Arial, sans-serif`;
+    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
     const d3 = Array.isArray(details.d3Arr) ? details.d3Arr.slice(0, 4) : [];
     d3.forEach((value, i) => {
       if (LEFT.top3d[i] !== undefined && value !== undefined) {
-        ctx.fillText(String(value), X(LEFT.top3d[i] + shiftX), Y(y3D));
+        ctx.fillText(String(value), X(LEFT.top3d[i] + shiftX), Y(row.top3d));
       }
     });
 
-    // E. TOP 4D (Merah Muda Neon - Font Diperbesar)
+    // E. TOP 4D (Merah Muda Terang - Tepat di Garis 4D)
     ctx.fillStyle = '#FF77AA';
-    ctx.font = `bold ${Math.round(15 * sy)}px Arial, sans-serif`;
+    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
     const d4 = Array.isArray(details.d4Arr) ? details.d4Arr.slice(0, 4) : [];
     d4.forEach((value, i) => {
       if (LEFT.top4d[i] !== undefined && value !== undefined) {
-        ctx.fillText(String(value), X(LEFT.top4d[i] + shiftX), Y(y4D));
+        ctx.fillText(String(value), X(LEFT.top4d[i] + shiftX), Y(row.top4d));
       }
     });
   });
