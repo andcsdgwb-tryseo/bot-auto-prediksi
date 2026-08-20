@@ -1,5 +1,6 @@
 const admin = require('firebase-admin');
 const https = require('https');
+const fs = require('fs'); // FIXED: Tambahkan require('fs') agar tidak crash saat cek template
 const { createCanvas, loadImage } = require('canvas');
 const FormData = require('form-data');
 const path = require('path');
@@ -219,7 +220,7 @@ function sendTelegramTextMessage(textMessage) {
 }
 
 // ==========================================
-// 6. CANVAS RENDERER PRESISI & JELAS (FIXED)
+// 6. CANVAS RENDERER PRESISI & JELAS
 // ==========================================
 async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   const fullPath = path.resolve(templatePath);
@@ -256,21 +257,20 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
 
   // POSISI HORIZONTAL (X) PRESISI KIRI
   const LEFT = {
-    bbfs: [210, 235, 260, 285, 310], // 5 Digit BBFS (Sebelah kanan "BBFS 5 Digit:")
-    cm: 80,                          // Angka CM (Di bawah / kanan label CM:)
-    cb: 185,                         // Angka CB (Di bawah / kanan label CB:)
-    twin: 295,                       // Angka TWIN (Di bawah / kanan label TWIN:)
+    bbfs: [210, 235, 260, 285, 310], // 5 Digit BBFS
+    cm: 80,                          // Angka CM
+    cb: 185,                         // Angka CB
+    twin: 295,                       // Angka TWIN
     top2d: [65, 126, 187, 248, 309], // 5 Pasang Angka TOP 2D
     top3d: [80, 151, 222, 293],      // 4 Pasang Angka TOP 3D
     top4d: [80, 151, 222, 293]       // 4 Pasang Angka TOP 4D
   };
 
-  // TITIK AWAL Y KOTAK PANELS (SINGAPORE/MACAU/QATAR)
-  // Baris 1 Top = 215, Baris 2 Top = 512, Baris 3 Top = 808
+  // TITIK AWAL Y KOTAK PANELS
   const ROWS = [
-    { bbfs: 216, small: 247, top2d: 288, top3d: 334, top4d: 379 }, // Baris 1: SINGAPORE / MALAYSIA
-    { bbfs: 512, small: 543, top2d: 584, top3d: 630, top4d: 675 }, // Baris 2: MACAU / BUSAN NIGHT
-    { bbfs: 808, small: 839, top2d: 880, top3d: 926, top4d: 971 }  // Baris 3: QATAR / HONGKONG
+    { bbfs: 216, small: 247, top2d: 288, top3d: 334, top4d: 379 }, // Baris 1
+    { bbfs: 512, small: 543, top2d: 584, top3d: 630, top4d: 675 }, // Baris 2
+    { bbfs: 808, small: 839, top2d: 880, top3d: 926, top4d: 971 }  // Baris 3
   ];
 
   groupDataArray.slice(0, 6).forEach((item, index) => {
@@ -294,7 +294,7 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
 
     const bbfs = String(item?.bbfs || '').replace(/\D/g, '').slice(0, 5).split('');
 
-    // A. BBFS 5 DIGIT (Warna Putih - Font Jelas)
+    // A. BBFS 5 DIGIT
     ctx.fillStyle = '#FFFFFF';
     ctx.font = `bold ${Math.round(16 * sy)}px Arial, sans-serif`;
     bbfs.forEach((digit, i) => {
@@ -303,14 +303,14 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
       }
     });
 
-    // B. CM, CB, TWIN (Kuning Mas Terang)
+    // B. CM, CB, TWIN
     ctx.fillStyle = '#FFE600';
     ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
     ctx.fillText(String(details.cm || '-'), X(LEFT.cm + shiftX), Y(row.small));
     ctx.fillText(String(details.cb || '-'), X(LEFT.cb + shiftX), Y(row.small));
     ctx.fillText(String(details.twin || '-'), X(LEFT.twin + shiftX), Y(row.small));
 
-    // C. TOP 2D (Cyan Terang - Tepat di Garis 2D)
+    // C. TOP 2D
     ctx.fillStyle = '#00FFCC';
     ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
     const d2 = Array.isArray(details.d2Arr) ? details.d2Arr.slice(0, 5) : [];
@@ -320,7 +320,7 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
       }
     });
 
-    // D. TOP 3D (Kuning Neon - Tepat di Garis 3D)
+    // D. TOP 3D
     ctx.fillStyle = '#FFFF00';
     ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
     const d3 = Array.isArray(details.d3Arr) ? details.d3Arr.slice(0, 4) : [];
@@ -330,7 +330,7 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
       }
     });
 
-    // E. TOP 4D (Merah Muda Terang - Tepat di Garis 4D)
+    // E. TOP 4D
     ctx.fillStyle = '#FF77AA';
     ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
     const d4 = Array.isArray(details.d4Arr) ? details.d4Arr.slice(0, 4) : [];
@@ -345,8 +345,11 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
 }
 
 function sendTelegramBannerPhoto(photoBuffer, captionText) {
-  return new Promise((resolve) => {
-    if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return resolve(null);
+  return new Promise((resolve, reject) => {
+    if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
+      console.error("[TELEGRAM ERROR]: Token atau Chat ID belum dikonfigurasi.");
+      return resolve(null);
+    }
 
     const form = new FormData();
     const replyMarkup = {
@@ -381,7 +384,15 @@ function sendTelegramBannerPhoto(photoBuffer, captionText) {
     const req = https.request(options, (res) => {
       let body = '';
       res.on('data', (chunk) => body += chunk);
-      res.on('end', () => resolve(body));
+      res.on('end', () => {
+        try {
+          const resObj = JSON.parse(body);
+          if (!resObj.ok) {
+            console.error("[TELEGRAM API REJECTED]:", resObj.description);
+          }
+        } catch (e) {}
+        resolve(body);
+      });
     });
 
     req.on('error', (err) => {
@@ -469,7 +480,7 @@ async function runBot() {
       }
     }
 
-    // SIMPAN KE FIRESTORE (UPDATE PANEL & LANDING PAGE)
+    // SIMPAN KE FIRESTORE
     await batch.commit();
     console.log(`[BOT] ✅ Firestore & History Panel berhasil diperbarui.`);
 
@@ -486,7 +497,7 @@ async function runBot() {
         await sendTelegramBannerPhoto(buffer1, captionBase);
         console.log(`[TELEGRAM] ✅ Banner Pasaran 1 terkirim.`);
       } catch (e) {
-        console.error("[ERROR BANNER 1]: Make sure template-pasaran-1.jpg exists.", e.message);
+        console.error("[ERROR BANNER 1]:", e.message);
       }
       await delay(2000);
     }
@@ -497,7 +508,7 @@ async function runBot() {
         await sendTelegramBannerPhoto(buffer2, captionBase);
         console.log(`[TELEGRAM] ✅ Banner Pasaran 2 terkirim.`);
       } catch (e) {
-        console.error("[ERROR BANNER 2]: Make sure template-pasaran-2.jpg exists.", e.message);
+        console.error("[ERROR BANNER 2]:", e.message);
       }
       await delay(2000);
     }
@@ -508,7 +519,7 @@ async function runBot() {
         await sendTelegramBannerPhoto(buffer3, captionBase);
         console.log(`[TELEGRAM] ✅ Banner Toto Macau terkirim.`);
       } catch (e) {
-        console.error("[ERROR BANNER MACAU]: Make sure template-totomacau.jpg exists.", e.message);
+        console.error("[ERROR BANNER MACAU]:", e.message);
       }
     }
 
