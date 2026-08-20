@@ -179,7 +179,7 @@ function formatTelegramMessage(pasaran, tanggal, bbfs, details) {
          `🎲 <b>3D:</b> <code>${details.d3}</code>\n` +
          `🎲 <b>4D:</b> <code>${details.d4}</code>\n` +
          `----------------------------------\n` +
-         `✅ <i>Prediksi Telah Diterbitkan!</i>`;
+         `✅ <i>Prediksi Otomatis Diterbitkan!</i>`;
 }
 
 function sendTelegramTextMessage(textMessage) {
@@ -343,6 +343,7 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
 
   return canvas.toBuffer('image/png');
 }
+
 function sendTelegramBannerPhoto(photoBuffer, captionText) {
   return new Promise((resolve) => {
     if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return resolve(null);
