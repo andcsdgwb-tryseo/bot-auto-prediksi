@@ -219,7 +219,7 @@ function sendTelegramTextMessage(textMessage) {
 }
 
 // ==========================================
-// 6. CANVAS RENDERER DENGAN KOORDINAT PRESISI
+// 6. CANVAS RENDERER PRESISI TEMPLATE BARU
 // ==========================================
 async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   const fullPath = path.resolve(templatePath);
@@ -228,8 +228,10 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   const canvas = createCanvas(image.width, image.height);
   const ctx = canvas.getContext('2d');
 
+  // Gambar template dasar
   ctx.drawImage(image, 0, 0, image.width, image.height);
 
+  // Skala berdasarkan dimensi asli gambar (misal 1024x1280)
   const sx = image.width / 1024;
   const sy = image.height / 1280;
 
@@ -239,27 +241,30 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // 1. TANGGAL HEADER ATAS (Tepat di Kotak Atas)
-  ctx.font = `bold ${Math.round(22 * sy)}px Arial`;
+  // 1. TANGGAL HEADER (Di dalam Kotak Hitam Kosong Atas)
+  ctx.font = `bold ${Math.round(20 * sy)}px Arial`;
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(tanggalFormatted || '', X(438), Y(106));
+  ctx.fillText(tanggalFormatted || '', X(438), Y(126));
 
+  // Jarak Antara Panel Kiri ke Panel Kanan (Kiri = SINGAPORE, Kanan = MALAYSIA)
   const RIGHT_SHIFT = 373;
 
+  // KOORDINAT HORIZONTAL PANEL KIRI
   const LEFT = {
-    bbfs: [214, 240, 266, 292, 318],
-    cm: 80,
-    cb: 185,
-    twin: 295,
-    top2d: [64, 126, 188, 250, 312],
-    top3d: [80, 148, 216, 284],
-    top4d: [80, 148, 216, 284]
+    bbfs: [215, 243, 271, 299, 327],  // 5 Digit Angka BBFS (sebelah kanan BBFS 5 Digit :)
+    cm: 95,                           // Angka CM (sebelah kanan CM :)
+    cb: 220,                          // Angka CB (sebelah kanan CB :)
+    twin: 325,                        // Angka TWIN (sebelah kanan TWIN :)
+    top2d: [65, 126, 187, 248, 309],  // 5 Pasang Angka 2D (di atas garis TOP 2D)
+    top3d: [80, 151, 222, 293],       // 4 Pasang Angka 3D (di atas garis TOP 3D)
+    top4d: [80, 151, 222, 293]        // 4 Pasang Angka 4D (di atas garis TOP 4D)
   };
 
+  // KOORDINAT VERTIKAL 3 BARIS PANEL PASARAN
   const ROWS = [
-    { bbfs: 216, small: 247, top2d: 288, top3d: 334, top4d: 379 },
-    { bbfs: 512, small: 543, top2d: 584, top3d: 630, top4d: 675 },
-    { bbfs: 808, small: 839, top2d: 880, top3d: 926, top4d: 971 }
+    { bbfs: 270, small: 328, top2d: 388, top3d: 448, top4d: 508 }, // Baris 1: SINGAPORE / MALAYSIA
+    { bbfs: 620, small: 678, top2d: 738, top3d: 798, top4d: 858 }, // Baris 2: MACAU / BUSAN NIGHT
+    { bbfs: 970, small: 1028, top2d: 1088, top3d: 1148, top4d: 1208 } // Baris 3: QATAR / HONGKONG
   ];
 
   groupDataArray.slice(0, 6).forEach((item, index) => {
@@ -273,16 +278,17 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
     const isLibur = item?.bbfs === "LIBUR";
     const details = item?.details || {};
 
+    // KONDISI PASARAN LIBUR
     if (isLibur) {
-      ctx.fillStyle = '#FF4444';
-      ctx.font = `bold ${Math.round(20 * sy)}px Arial`;
+      ctx.fillStyle = '#FF3333';
+      ctx.font = `bold ${Math.round(22 * sy)}px Arial`;
       ctx.fillText("PASARAN LIBUR", X(188 + shiftX), Y(row.top2d));
       return;
     }
 
     const bbfs = String(item?.bbfs || '').replace(/\D/g, '').slice(0, 5).split('');
 
-    // 1. BBFS
+    // A. ISI BBFS (5 Digit) - Warna Putih
     ctx.fillStyle = '#FFFFFF';
     ctx.font = `bold ${Math.round(15 * sy)}px Arial`;
     bbfs.forEach((digit, i) => {
@@ -291,14 +297,14 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
       }
     });
 
-    // 2. CM, CB, TWIN
+    // B. ISI CM, CB, TWIN - Warna Emas / Kuning Presisi
     ctx.fillStyle = '#FFD700';
-    ctx.font = `bold ${Math.round(13 * sy)}px Arial`;
+    ctx.font = `bold ${Math.round(14 * sy)}px Arial`;
     ctx.fillText(String(details.cm || '-'), X(LEFT.cm + shiftX), Y(row.small));
     ctx.fillText(String(details.cb || '-'), X(LEFT.cb + shiftX), Y(row.small));
     ctx.fillText(String(details.twin || '-'), X(LEFT.twin + shiftX), Y(row.small));
 
-    // 3. TOP 2D
+    // C. ISI TOP 2D (5 Angka di Atas Garis TOP 2D) - Warna Hijau Tosca
     ctx.fillStyle = '#00FFCC';
     ctx.font = `bold ${Math.round(13 * sy)}px Arial`;
     const d2 = Array.isArray(details.d2Arr) ? details.d2Arr.slice(0, 5) : [];
@@ -308,7 +314,7 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
       }
     });
 
-    // 4. TOP 3D
+    // D. ISI TOP 3D (4 Angka di Atas Garis TOP 3D) - Warna Kuning
     ctx.fillStyle = '#FFFF00';
     ctx.font = `bold ${Math.round(13 * sy)}px Arial`;
     const d3 = Array.isArray(details.d3Arr) ? details.d3Arr.slice(0, 4) : [];
@@ -318,9 +324,9 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
       }
     });
 
-    // 5. TOP 4D
+    // E. ISI TOP 4D (4 Angka di Atas Garis TOP 4D) - Warna Merah Muda / Orange
     ctx.fillStyle = '#FF8888';
-    ctx.font = `bold ${Math.round(12 * sy)}px Arial`;
+    ctx.font = `bold ${Math.round(13 * sy)}px Arial`;
     const d4 = Array.isArray(details.d4Arr) ? details.d4Arr.slice(0, 4) : [];
     d4.forEach((value, i) => {
       if (LEFT.top4d[i] !== undefined && value !== undefined) {
@@ -331,7 +337,6 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
 
   return canvas.toBuffer('image/png');
 }
-
 function sendTelegramBannerPhoto(photoBuffer, captionText) {
   return new Promise((resolve) => {
     if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return resolve(null);
