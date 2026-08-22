@@ -11,6 +11,10 @@ on:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./botprediksi
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -22,12 +26,12 @@ jobs:
 
       - name: Install Dependencies
         run: npm install
-        working-directory: ./botprediksi
 
       - name: Run Bot Script
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_TOPIC_GAMBAR_ID: ${{ secrets.TELEGRAM_TOPIC_GAMBAR_ID }}
+          TELEGRAM_TOPIC_TEXT_ID: ${{ secrets.TELEGRAM_TOPIC_TEXT_ID }}
         run: node bot-auto.js
-        working-directory: ./botprediksi
