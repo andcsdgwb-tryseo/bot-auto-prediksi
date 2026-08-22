@@ -117,11 +117,18 @@ function generateBBFS() {
 function getRandomDigitComboArr(bbfsArr, digitLength, count) {
   const results = new Set();
   let attempts = 0;
-  while (results.size < count && attempts < 50) {
+
+  while (results.size < count && attempts < 100) {
     attempts++;
-    const shuffled = [...bbfsArr].sort(() => 0.5 - Math.random());
-    results.add(shuffled.slice(0, digitLength).join(''));
+    // Ambil digit secara acak dari bbfsArr
+    let combo = '';
+    for (let i = 0; i < digitLength; i++) {
+      const randomIndex = Math.floor(Math.random() * bbfsArr.length);
+      combo += bbfsArr[randomIndex];
+    }
+    results.add(combo);
   }
+
   return Array.from(results);
 }
 
@@ -496,7 +503,7 @@ async function runBot() {
     // PROSES GAMBAR DENGAN TRY-CATCH INDIVIDUAL
     if (group1Data.length > 0) {
       try {
-        const buffer1 = await drawGroupBanner(group1Data, './template-pasaran-1.jpg', tanggalFormatted);
+        const buffer1 = await drawGroupBanner(group1Data, path.join(__dirname, 'template-pasaran-1.jpg'), tanggalFormatted);
         await sendTelegramBannerPhoto(buffer1, captionBase);
         console.log(`[TELEGRAM] ✅ Banner Pasaran 1 terkirim.`);
       } catch (e) {
@@ -507,7 +514,7 @@ async function runBot() {
 
     if (group2Data.length > 0) {
       try {
-        const buffer2 = await drawGroupBanner(group2Data, './template-pasaran-2.jpg', tanggalFormatted);
+        const buffer2 = await drawGroupBanner(group2Data, path.join(__dirname, 'template-pasaran-2.jpg'), tanggalFormatted);
         await sendTelegramBannerPhoto(buffer2, captionBase);
         console.log(`[TELEGRAM] ✅ Banner Pasaran 2 terkirim.`);
       } catch (e) {
@@ -518,7 +525,7 @@ async function runBot() {
 
     if (macauGroupData.length > 0) {
       try {
-        const buffer3 = await drawGroupBanner(macauGroupData, './template-totomacau.jpg', tanggalFormatted);
+        const buffer3 = await drawGroupBanner(macauGroupData, path.join(__dirname, 'template-totomacau.jpg'), tanggalFormatted);
         await sendTelegramBannerPhoto(buffer3, captionBase);
         console.log(`[TELEGRAM] ✅ Banner Toto Macau terkirim.`);
       } catch (e) {
