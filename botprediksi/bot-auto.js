@@ -474,10 +474,7 @@ async function runBot() {
       const docId = `${tanggalWIB}_${pasaran.replace(/\s+/g, '')}`;
       batch.set(prediksiRef.doc(docId), payload, { merge: true });
 
-      // Kirim Teks Prediksi ke Topic ID 29
-      const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, bbfs, details);
-      await sendTelegramTextMessage(textMsg);
-
+      // Kelompokkan data gambar
       const itemData = { pasaran, bbfs, details };
       const normP = normalize(pasaran);
 
@@ -490,9 +487,22 @@ async function runBot() {
       }
     }
 
-    // SIMPAN KE FIRESTORE
+    // 1. SIMPAN KE FIRESTORE TERLEBIH DAHULU (AGAR HISTORY & PLAYER.HTML LANGSUNG TERISI)
     await batch.commit();
     console.log(`[BOT] ✅ Firestore & History Panel berhasil diperbarui.`);
+
+    // 2. KIRIM TEKS KE TELEGRAM DENGAN JEDA (DELAY) 300ms AGAR TIDAK KENA RATE-LIMIT
+    for (const pasaran of DAFTAR_PASARAN) {
+      const daysOff = JADWAL_OFF[pasaran] || [];
+      const isLibur = daysOff.includes(currentDayWIB);
+      const bbfs = isLibur ? "LIBUR" : (group1Data.concat(group2Data, macauGroupData).find(x => x.pasaran === pasaran)?.bbfs || generateBBFS());
+      const details = generatePredictionDetails(bbfs);
+
+      const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, bbfs, details);
+      await sendTelegramTextMessage(textMsg);
+      await delay(300); // Jeda aman Telegram
+    }
+    console.log(`[BOT] ✅ Seluruh teks 18 pasaran terkirim ke Telegram.`);
 
     const captionBase = `🎯 <b>PREDIKSI TOGEL ${tanggalFormatted}</b> 🎯\n\n` +
                         `🔥 <b>Angka pilihan hari ini sudah siap!</b>\n` +
@@ -500,7 +510,7 @@ async function runBot() {
                         `⚡ Prediksi tajam, pilihan terbaik, dan jadwal lengkap berbagai pasaran.\n\n` +
                         `✨ Cek angka pilihanmu dan tetap bermain secara bijak.`;
 
-    // PROSES GAMBAR DENGAN TRY-CATCH INDIVIDUAL
+    // 3. PROSES BANNER GAMBAR
     if (group1Data.length > 0) {
       try {
         const buffer1 = await drawGroupBanner(group1Data, path.join(__dirname, 'template-pasaran-1.jpg'), tanggalFormatted);
