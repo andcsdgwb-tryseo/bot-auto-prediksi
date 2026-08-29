@@ -425,11 +425,15 @@ async function runBot() {
   console.log(`[BOT] Memulai otomatisasi tanggal: ${tanggalWIB} (${tanggalFormatted})`);
 
   try {
-    const botConfigDoc = await db.collection('settings').doc('bot_control').get();
-    if (botConfigDoc.exists && botConfigDoc.data().active === false) {
-      console.log("[BOT] Status bot OFF. Eksekusi dibatalkan.");
-      return;
-    }
+  const botConfigDoc = await db.collection('settings').doc('bot_control').get();
+  
+  // Hanya batalkan JIKA dokumen ada DAN nilai active secara eksplisit bernilai false
+  if (botConfigDoc.exists && botConfigDoc.data().active === false) {
+    console.log("[BOT] Status bot OFF. Eksekusi dibatalkan.");
+    return;
+  }
+  
+  console.log("[BOT] Status bot ON. Melanjutkan eksekusi...");
 
     const batch = db.batch();
     const prediksiRef = db.collection('prediksi');
