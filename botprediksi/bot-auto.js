@@ -1,7 +1,7 @@
 const admin = require('firebase-admin');
 const https = require('https');
 const fs = require('fs');
-const puppeteer = require('puppeteer'); // DIGANTI: Menggunakan puppeteer (bukan Canvas)
+const puppeteer = require('puppeteer');
 const FormData = require('form-data');
 const path = require('path');
 
@@ -246,9 +246,9 @@ function sendTelegramTextMessage(textMessage) {
 }
 
 // ==========================================
-// 6. PUPPETEER BANNER RENDERER (DIPERBAIKI)
+// 6. PUPPETEER BANNER RENDERER (DIPERBAIKI UNTUK 1 HTML MULTI-BANNER)
 // ==========================================
-async function drawGroupBanner(groupDataArray, templateHtmlPath, tanggalFormatted) {
+async function drawGroupBanner(groupDataArray, templateHtmlPath, tanggalFormatted, bannerId = "banner-1") {
   const fullPath = path.resolve(templateHtmlPath);
   
   if (!fs.existsSync(fullPath)) {
@@ -267,14 +267,17 @@ async function drawGroupBanner(groupDataArray, templateHtmlPath, tanggalFormatte
   // Buka file template HTML lokal
   await page.goto(`file://${fullPath}`, { waitUntil: 'networkidle0' });
 
-  // Inject Data ke Elemen HTML
-  await page.evaluate((dataArray, tgl, mapDisplay) => {
-    // 1. Set Tanggal Header
-    const dateBox = document.querySelector('.date-box');
+  // Inject Data ke Elemen HTML spesifik berdasarkan Selector ID Banner
+  await page.evaluate((dataArray, tgl, mapDisplay, targetBannerId) => {
+    const targetBanner = document.getElementById(targetBannerId);
+    if (!targetBanner) return;
+
+    // 1. Set Tanggal Header pada banner yang sedang diproses
+    const dateBox = targetBanner.querySelector('.date-box');
     if (dateBox) dateBox.innerText = tgl;
 
-    // 2. Set Data 6 Pasaran
-    const cards = document.querySelectorAll('.card-pasaran');
+    // 2. Set Data 6 Pasaran pada banner yang sedang diproses
+    const cards = targetBanner.querySelectorAll('.card-pasaran');
     
     dataArray.slice(0, 6).forEach((item, index) => {
       const card = cards[index];
@@ -313,10 +316,10 @@ async function drawGroupBanner(groupDataArray, templateHtmlPath, tanggalFormatte
       if (slots[5]) slots[5].innerText = (details.d3Arr || []).join('  ');
       if (slots[6]) slots[6].innerText = (details.d4Arr || []).join('  ');
     });
-  }, groupDataArray, tanggalFormatted, MAP_NAMA_DISPLAY);
+  }, groupDataArray, tanggalFormatted, MAP_NAMA_DISPLAY, bannerId);
 
-  // Ambil Screenshot elemen banner
-  const bannerElement = await page.$('.banner-container');
+  // Ambil Screenshot hanya elemen banner yang ditargetkan (#banner-1, #banner-2, atau #banner-3)
+  const bannerElement = await page.$(`#${bannerId}`);
   const imageBuffer = await bannerElement.screenshot({ type: 'png' });
 
   await browser.close();
@@ -384,7 +387,7 @@ function sendTelegramBannerPhoto(photoBuffer, captionText) {
 }
 
 // ==========================================
-// 7. EKSEKUSI UTAMA (MAIN BOT FUNCTION - DIPERBAIKI)
+// 7. EKSEKUSI UTAMA (MAIN BOT FUNCTION)
 // ==========================================
 async function runBot() {
   const tanggalWIB = getTodayWIB();
@@ -481,13 +484,13 @@ async function runBot() {
                         `⚡ Prediksi tajam, pilihan terbaik, dan jadwal lengkap berbagai pasaran.\n\n` +
                         `✨ Cek angka pilihanmu dan tetap bermain secara bijak.`;
 
-    // Path mengarah ke template.html yang ada di folder botprediksi
+    // Path mengarah ke file template HTML gabungan Anda
     const templateHtmlPath = path.join(__dirname, 'template.html');
 
-    // 3. PROSES BANNER GAMBAR VIA PUPPETEER
+    // 3. PROSES BANNER GAMBAR VIA PUPPETEER (MENGGUNAKAN ID UNIK)
     if (group1Data.length > 0) {
       try {
-        const buffer1 = await drawGroupBanner(group1Data, templateHtmlPath, tanggalFormatted);
+        const buffer1 = await drawGroupBanner(group1Data, templateHtmlPath, tanggalFormatted, 'banner-1');
         await sendTelegramBannerPhoto(buffer1, captionBase);
         console.log(`[TELEGRAM] ✅ Banner Pasaran 1 terkirim.`);
       } catch (e) {
@@ -498,7 +501,7 @@ async function runBot() {
 
     if (group2Data.length > 0) {
       try {
-        const buffer2 = await drawGroupBanner(group2Data, templateHtmlPath, tanggalFormatted);
+        const buffer2 = await drawGroupBanner(group2Data, templateHtmlPath, tanggalFormatted, 'banner-2');
         await sendTelegramBannerPhoto(buffer2, captionBase);
         console.log(`[TELEGRAM] ✅ Banner Pasaran 2 terkirim.`);
       } catch (e) {
@@ -509,7 +512,7 @@ async function runBot() {
 
     if (macauGroupData.length > 0) {
       try {
-        const buffer3 = await drawGroupBanner(macauGroupData, templateHtmlPath, tanggalFormatted);
+        const buffer3 = await drawGroupBanner(macauGroupData, templateHtmlPath, tanggalFormatted, 'banner-3');
         await sendTelegramBannerPhoto(buffer3, captionBase);
         console.log(`[TELEGRAM] ✅ Banner Toto Macau terkirim.`);
       } catch (e) {
