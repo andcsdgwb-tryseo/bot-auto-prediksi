@@ -245,89 +245,8 @@ function sendTelegramTextMessage(textMessage) {
   });
 }
 
-// ==========================================
-// 6. PUPPETEER BANNER RENDERER (DIPERBAIKI UNTUK 1 HTML MULTI-BANNER)
-// ==========================================
-async function drawGroupBanner(groupDataArray, templateHtmlPath, tanggalFormatted, bannerId = "banner-1") {
-  const fullPath = path.resolve(templateHtmlPath);
-  
-  if (!fs.existsSync(fullPath)) {
-    throw new Error(`File template HTML tidak ditemukan di: ${fullPath}`);
-  }
-
-  // Buka Headless Browser (Chrome) via Puppeteer
-  const browser = await puppeteer.launch({
-    headless: "new",
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1024, height: 1280, deviceScaleFactor: 2 });
-  
-  // Buka file template HTML lokal
-  await page.goto(`file://${fullPath}`, { waitUntil: 'networkidle0' });
-
-  // Inject Data ke Elemen HTML spesifik berdasarkan Selector ID Banner
-  await page.evaluate((dataArray, tgl, mapDisplay, targetBannerId) => {
-    const targetBanner = document.getElementById(targetBannerId);
-    if (!targetBanner) return;
-
-    // 1. Set Tanggal Header pada banner yang sedang diproses
-    const dateBox = targetBanner.querySelector('.date-box');
-    if (dateBox) dateBox.innerText = tgl;
-
-    // 2. Set Data 6 Pasaran pada banner yang sedang diproses
-    const cards = targetBanner.querySelectorAll('.card-pasaran');
-    
-    dataArray.slice(0, 6).forEach((item, index) => {
-      const card = cards[index];
-      if (!card) return;
-
-      const namaDisplay = mapDisplay[item.pasaran] || item.pasaran;
-
-      // Update Judul Pasaran
-      const titleElem = card.querySelector('.pasaran-title');
-      if (titleElem) titleElem.innerText = namaDisplay;
-
-      const isLibur = item?.bbfs === "LIBUR";
-      const details = item?.details || {};
-
-      if (isLibur) {
-        card.innerHTML = `
-          <div class="pasaran-title">${namaDisplay}</div>
-          <div style="color: #ff3333; font-size: 24px; font-weight: bold; text-align: center; margin: auto 0;">
-            PASARAN LIBUR
-          </div>
-        `;
-        return;
-      }
-
-      // Format BBFS 5 digit
-      const rawBbfs = String(item?.bbfs || '').replace(/\D/g, '').slice(0, 5);
-      const bbfsFormatted = rawBbfs.split('').join('  ');
-
-      const slots = card.querySelectorAll('.slot-area');
-      
-      if (slots[0]) slots[0].innerText = bbfsFormatted;
-      if (slots[1]) slots[1].innerText = details.cm || '-';
-      if (slots[2]) slots[2].innerText = details.cb || '-';
-      if (slots[3]) slots[3].innerText = details.twin || '-';
-      if (slots[4]) slots[4].innerText = (details.d2Arr || []).join('  ');
-      if (slots[5]) slots[5].innerText = (details.d3Arr || []).join('  ');
-      if (slots[6]) slots[6].innerText = (details.d4Arr || []).join('  ');
-    });
-  }, groupDataArray, tanggalFormatted, MAP_NAMA_DISPLAY, bannerId);
-
-  // Ambil Screenshot hanya elemen banner yang ditargetkan (#banner-1, #banner-2, atau #banner-3)
-  const bannerElement = await page.$(`#${bannerId}`);
-  const imageBuffer = await bannerElement.screenshot({ type: 'png' });
-
-  await browser.close();
-  return imageBuffer;
-}
-
 function sendTelegramBannerPhoto(photoBuffer, captionText) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) {
       console.error("[TELEGRAM ERROR]: Token atau Chat ID belum dikonfigurasi.");
       return resolve(null);
@@ -366,15 +285,7 @@ function sendTelegramBannerPhoto(photoBuffer, captionText) {
     const req = https.request(options, (res) => {
       let body = '';
       res.on('data', (chunk) => body += chunk);
-      res.on('end', () => {
-        try {
-          const resObj = JSON.parse(body);
-          if (!resObj.ok) {
-            console.error("[TELEGRAM API REJECTED]:", resObj.description);
-          }
-        } catch (e) {}
-        resolve(body);
-      });
+      res.on('end', () => resolve(body));
     });
 
     req.on('error', (err) => {
@@ -384,6 +295,82 @@ function sendTelegramBannerPhoto(photoBuffer, captionText) {
 
     form.pipe(req);
   });
+}
+
+// ==========================================
+// 6. PUPPETEER MULTI-BANNER RENDERER
+// ==========================================
+async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tanggalFormatted) {
+  const fullPath = path.resolve(templateHtmlPath);
+  if (!fs.existsSync(fullPath)) {
+    throw new Error(`File template HTML tidak ditemukan di: ${fullPath}`);
+  }
+
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1024, height: 1280, deviceScaleFactor: 2 });
+  await page.goto(`file://${fullPath}`, { waitUntil: 'networkidle0' });
+
+  // Inject seluruh data sekaligus ke HTML
+  await page.evaluate((groups, tgl, mapDisplay) => {
+    groups.forEach(({ bannerId, data }) => {
+      const targetBanner = document.getElementById(bannerId);
+      if (!targetBanner) return;
+
+      const dateBox = targetBanner.querySelector('.date-box');
+      if (dateBox) dateBox.innerText = tgl;
+
+      const cards = targetBanner.querySelectorAll('.card-pasaran');
+      data.slice(0, 6).forEach((item, index) => {
+        const card = cards[index];
+        if (!card) return;
+
+        const namaDisplay = mapDisplay[item.pasaran] || item.pasaran;
+        const titleElem = card.querySelector('.pasaran-title');
+        if (titleElem) titleElem.innerText = namaDisplay;
+
+        if (item.bbfs === "LIBUR") {
+          card.innerHTML = `
+            <div class="pasaran-title">${namaDisplay}</div>
+            <div style="color: #ff3333; font-size: 24px; font-weight: bold; text-align: center; margin: auto 0;">
+              PASARAN LIBUR
+            </div>
+          `;
+          return;
+        }
+
+        const rawBbfs = String(item.bbfs || '').replace(/\D/g, '').slice(0, 5);
+        const bbfsFormatted = rawBbfs.split('').join('  ');
+        const slots = card.querySelectorAll('.slot-area');
+        const details = item.details || {};
+
+        if (slots[0]) slots[0].innerText = bbfsFormatted;
+        if (slots[1]) slots[1].innerText = details.cm || '-';
+        if (slots[2]) slots[2].innerText = details.cb || '-';
+        if (slots[3]) slots[3].innerText = details.twin || '-';
+        if (slots[4]) slots[4].innerText = (details.d2Arr || []).join('  ');
+        if (slots[5]) slots[5].innerText = (details.d3Arr || []).join('  ');
+        if (slots[6]) slots[6].innerText = (details.d4Arr || []).join('  ');
+      });
+    });
+  }, allGroups, tanggalFormatted, MAP_NAMA_DISPLAY);
+
+  // Ambil Screenshot untuk masing-masing banner
+  const imageBuffers = [];
+  for (const group of allGroups) {
+    const bannerElement = await page.$(`#${group.bannerId}`);
+    if (bannerElement) {
+      const buffer = await bannerElement.screenshot({ type: 'png' });
+      imageBuffers.push({ bannerId: group.bannerId, buffer });
+    }
+  }
+
+  await browser.close();
+  return imageBuffers;
 }
 
 // ==========================================
@@ -412,9 +399,9 @@ async function runBot() {
     const group1Data = [];
     const group2Data = [];
     const macauGroupData = [];
+    const allPredictionsMap = {};
 
     const normalize = (str) => String(str || '').replace(/\s+/g, '').toUpperCase();
-
     const normG1 = KELOMPOK_PASARAN_1.map(normalize);
     const normG2 = KELOMPOK_PASARAN_2.map(normalize);
     const normMacau = KELOMPOK_MACAU.map(normalize);
@@ -450,8 +437,9 @@ async function runBot() {
       batch.set(prediksiRef.doc(docId), payload, { merge: true });
 
       const itemData = { pasaran, bbfs, details };
-      const normP = normalize(pasaran);
+      allPredictionsMap[pasaran] = itemData;
 
+      const normP = normalize(pasaran);
       if (normMacau.includes(normP)) {
         macauGroupData.push(itemData);
       } else if (normG1.includes(normP)) {
@@ -465,14 +453,10 @@ async function runBot() {
     await batch.commit();
     console.log(`[BOT] ✅ Firestore & History Panel berhasil diperbarui.`);
 
-    // 2. KIRIM TEKS KE TELEGRAM
+    // 2. KIRIM TEKS KE TELEGRAM (Menggunakan Data Prediksi yang Sama)
     for (const pasaran of DAFTAR_PASARAN) {
-      const daysOff = JADWAL_OFF[pasaran] || [];
-      const isLibur = daysOff.includes(currentDayWIB);
-      const bbfs = isLibur ? "LIBUR" : (group1Data.concat(group2Data, macauGroupData).find(x => x.pasaran === pasaran)?.bbfs || generateBBFS());
-      const details = generatePredictionDetails(bbfs);
-
-      const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, bbfs, details);
+      const pred = allPredictionsMap[pasaran];
+      const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, pred.bbfs, pred.details);
       await sendTelegramTextMessage(textMsg);
       await delay(300);
     }
@@ -484,40 +468,21 @@ async function runBot() {
                         `⚡ Prediksi tajam, pilihan terbaik, dan jadwal lengkap berbagai pasaran.\n\n` +
                         `✨ Cek angka pilihanmu dan tetap bermain secara bijak.`;
 
-    // Path mengarah ke file template HTML gabungan Anda
     const templateHtmlPath = path.join(__dirname, 'template.html');
 
-    // 3. PROSES BANNER GAMBAR VIA PUPPETEER (MENGGUNAKAN ID UNIK)
-    if (group1Data.length > 0) {
-      try {
-        const buffer1 = await drawGroupBanner(group1Data, templateHtmlPath, tanggalFormatted, 'banner-1');
-        await sendTelegramBannerPhoto(buffer1, captionBase);
-        console.log(`[TELEGRAM] ✅ Banner Pasaran 1 terkirim.`);
-      } catch (e) {
-        console.error("[ERROR BANNER 1]:", e.message);
-      }
-      await delay(2000);
-    }
+    // 3. PROSES BANNER GAMBAR VIA PUPPETEER (Sekali Launch)
+    const allGroups = [
+      { bannerId: 'banner-1', data: group1Data },
+      { bannerId: 'banner-2', data: group2Data },
+      { bannerId: 'banner-3', data: macauGroupData }
+    ];
 
-    if (group2Data.length > 0) {
-      try {
-        const buffer2 = await drawGroupBanner(group2Data, templateHtmlPath, tanggalFormatted, 'banner-2');
-        await sendTelegramBannerPhoto(buffer2, captionBase);
-        console.log(`[TELEGRAM] ✅ Banner Pasaran 2 terkirim.`);
-      } catch (e) {
-        console.error("[ERROR BANNER 2]:", e.message);
-      }
-      await delay(2000);
-    }
+    const renderedBanners = await renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tanggalFormatted);
 
-    if (macauGroupData.length > 0) {
-      try {
-        const buffer3 = await drawGroupBanner(macauGroupData, templateHtmlPath, tanggalFormatted, 'banner-3');
-        await sendTelegramBannerPhoto(buffer3, captionBase);
-        console.log(`[TELEGRAM] ✅ Banner Toto Macau terkirim.`);
-      } catch (e) {
-        console.error("[ERROR BANNER MACAU]:", e.message);
-      }
+    for (const item of renderedBanners) {
+      await sendTelegramBannerPhoto(item.buffer, captionBase);
+      console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim.`);
+      await delay(1500);
     }
 
   } catch (error) {
