@@ -5,6 +5,7 @@
   "dependencies": {
     "canvas": "^2.11.2",
     "firebase-admin": "^11.11.1",
-    "form-data": "^4.0.0"
+    "form-data": "^4.0.0",
+    "puppeteer": "^21.0.0"
   }
 }
