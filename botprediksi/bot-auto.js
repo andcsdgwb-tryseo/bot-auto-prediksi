@@ -288,32 +288,32 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
   ctx.textBaseline = 'middle';
 
   // 1. TANGGAL HEADER (Di Kotak Hitam Atas)
-  ctx.font = `bold ${Math.round(20 * sy)}px Arial, sans-serif`;
+  ctx.font = `bold ${Math.round(22 * sy)}px Arial, sans-serif`;
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(tanggalFormatted || '', X(438), Y(102));
+  ctx.fillText(tanggalFormatted || '', X(438), Y(92));
 
   // Jarak Horisontal Panel Kiri ke Panel Kanan (SINGAPORE -> MALAYSIA)
   const RIGHT_SHIFT = 373;
 
-  // KOORDINAT HORIZONTAL (X) PANEL KIRI
+  // KOORDINAT HORIZONTAL (X) PANEL KIRI (CENTER POINT PER SEKTOR)
   const LEFT = {
-    bbfs: [215, 238, 261, 284, 307], // 5 Digit BBFS (Pas di samping "BBFS 5 Digit:")
-    cm: 88,                          // Angka CM (Di samping "CM :")
-    cb: 198,                         // Angka CB (Di samping "CB :")
-    twin: 308,                       // Angka TWIN (Di samping "TWIN :")
-    top2d: [62, 124, 186, 248, 310], // 5 Pasang Angka TOP 2D
-    top3d: [78, 150, 222, 294],      // 4 Pasang Angka TOP 3D
-    top4d: [78, 150, 222, 294]       // 4 Pasang Angka TOP 4D
+    bbfs: 260,                       // Posisi tengah untuk 5 Digit BBFS
+    cm: 80,                          // Posisi bawah CM
+    cb: 188,                         // Posisi bawah CB
+    twin: 305,                       // Posisi bawah TWIN
+    top2d: [62, 124, 186, 248, 310], // 5 Kolom TOP 2D
+    top3d: [62, 146, 230, 314],      // 4 Kolom TOP 3D
+    top4d: [62, 146, 230, 314]       // 4 Kolom TOP 4D
   };
 
-  // KOORDINAT VERTIKAL (Y) TIAP BARIS PASARAN
+  // KOORDINAT VERTIKAL (Y) TIAP BARIS PASARAN (DIPERBAIKI AGAR PAS PADA SLOT KOSONG)
   const ROWS = [
     // Baris 1: SINGAPORE / MALAYSIA
-    { bbfs: 220, small: 254, top2d: 302, top3d: 356, top4d: 410 },
+    { bbfs: 236, small: 398, top2d: 280, top3d: 334, top4d: 388 },
     // Baris 2: MACAU / BUSAN NIGHT
-    { bbfs: 478, small: 512, top2d: 560, top3d: 614, top4d: 668 },
+    { bbfs: 494, small: 656, top2d: 538, top3d: 592, top4d: 646 },
     // Baris 3: QATAR / HONGKONG
-    { bbfs: 736, small: 770, top2d: 818, top3d: 872, top4d: 926 }
+    { bbfs: 752, small: 914, top2d: 796, top3d: 850, top4d: 904 }
   ];
 
   groupDataArray.slice(0, 6).forEach((item, index) => {
@@ -330,32 +330,30 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
     // STATUS LIBUR
     if (isLibur) {
       ctx.fillStyle = '#FF3333';
-      ctx.font = `bold ${Math.round(24 * sy)}px Arial, sans-serif`;
-      ctx.fillText("PASARAN LIBUR", X(188 + shiftX), Y(row.top2d));
+      ctx.font = `bold ${Math.round(26 * sy)}px Arial, sans-serif`;
+      ctx.fillText("PASARAN LIBUR", X(188 + shiftX), Y(row.top3d));
       return;
     }
 
-    const bbfs = String(item?.bbfs || '').replace(/\D/g, '').slice(0, 5).split('');
+    // Format BBFS 5 Digit dengan Spasi (contoh: "3  6  8  5  1")
+    const rawBbfs = String(item?.bbfs || '').replace(/\D/g, '').slice(0, 5);
+    const bbfsFormatted = rawBbfs.split('').join('  ');
 
-    // A. BBFS 5 DIGIT (Putih Tajam)
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = `bold ${Math.round(15 * sy)}px Arial, sans-serif`;
-    bbfs.forEach((digit, i) => {
-      if (LEFT.bbfs[i] !== undefined) {
-        ctx.fillText(digit, X(LEFT.bbfs[i] + shiftX), Y(row.bbfs));
-      }
-    });
+    // A. BBFS 5 DIGIT (Putih Tajam & Pas Slot Header)
+    ctx.fillStyle = '#00FFFF'; // Cyan Neon agar kontras & jelas
+    ctx.font = `bold ${Math.round(16 * sy)}px Arial, sans-serif`;
+    ctx.fillText(bbfsFormatted, X(LEFT.bbfs + shiftX), Y(row.bbfs));
 
-    // B. CM, CB, TWIN (Kuning Mas)
-    ctx.fillStyle = '#FFD700';
+    // B. CM, CB, TWIN (Tercetak Rapi di Bawah Slot)
+    ctx.fillStyle = '#FFD700'; // Kuning Emas
     ctx.font = `bold ${Math.round(13 * sy)}px Arial, sans-serif`;
     ctx.fillText(String(details.cm || '-'), X(LEFT.cm + shiftX), Y(row.small));
     ctx.fillText(String(details.cb || '-'), X(LEFT.cb + shiftX), Y(row.small));
     ctx.fillText(String(details.twin || '-'), X(LEFT.twin + shiftX), Y(row.small));
 
-    // C. TOP 2D (Cyan / Hijau Tosca)
+    // C. TOP 2D (Hijau Tosca Pas di Slot)
     ctx.fillStyle = '#00FFCC';
-    ctx.font = `bold ${Math.round(13 * sy)}px Arial, sans-serif`;
+    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
     const d2 = Array.isArray(details.d2Arr) ? details.d2Arr.slice(0, 5) : [];
     d2.forEach((value, i) => {
       if (LEFT.top2d[i] !== undefined && value !== undefined) {
@@ -363,9 +361,9 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
       }
     });
 
-    // D. TOP 3D (Kuning Neon)
+    // D. TOP 3D (Kuning Terang Pas di Slot)
     ctx.fillStyle = '#FFFF00';
-    ctx.font = `bold ${Math.round(13 * sy)}px Arial, sans-serif`;
+    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
     const d3 = Array.isArray(details.d3Arr) ? details.d3Arr.slice(0, 4) : [];
     d3.forEach((value, i) => {
       if (LEFT.top3d[i] !== undefined && value !== undefined) {
@@ -373,9 +371,9 @@ async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
       }
     });
 
-    // E. TOP 4D (Merah Muda / Coral)
-    ctx.fillStyle = '#FF77AA';
-    ctx.font = `bold ${Math.round(13 * sy)}px Arial, sans-serif`;
+    // E. TOP 4D (Merah Coral/Pink Bright Pas di Slot)
+    ctx.fillStyle = '#FF66AA';
+    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
     const d4 = Array.isArray(details.d4Arr) ? details.d4Arr.slice(0, 4) : [];
     d4.forEach((value, i) => {
       if (LEFT.top4d[i] !== undefined && value !== undefined) {
