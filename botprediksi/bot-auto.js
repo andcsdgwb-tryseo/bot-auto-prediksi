@@ -406,35 +406,61 @@ async function runBot() {
     const normG2 = KELOMPOK_PASARAN_2.map(normalize);
     const normMacau = KELOMPOK_MACAU.map(normalize);
 
+    // BACA DATA YANG SUDAH ADA DI FIRESTORE TERLEBIH DAHULU
     for (const pasaran of DAFTAR_PASARAN) {
-      const daysOff = JADWAL_OFF[pasaran] || [];
-      const isLibur = daysOff.includes(currentDayWIB);
-
-      const bbfs = isLibur ? "LIBUR" : generateBBFS();
-      const details = generatePredictionDetails(bbfs);
-      const jamInfo = JADWAL_JAM[pasaran] || { tutup: "- WIB", result: "- WIB" };
-
-      const payload = {
-        pasaran, 
-        tanggal: tanggalWIB, 
-        bbfs,
-        jamTutup: jamInfo.tutup, 
-        jamResult: jamInfo.result,
-        colokBebas: details.cb, 
-        colok_bebas: details.cb,
-        colokMacau: details.cm, 
-        colok_macau: details.cm,
-        shio: details.shio, 
-        twin: details.twin,
-        d2: details.d2, 
-        d3: details.d3, 
-        d4: details.d4,
-        createdBy: "BOT_AUTOMATION",
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      };
-
       const docId = `${tanggalWIB}_${pasaran.replace(/\s+/g, '')}`;
-      batch.set(prediksiRef.doc(docId), payload, { merge: true });
+      const docSnap = await prediksiRef.doc(docId).get();
+
+      let bbfs, details, jamInfo;
+
+      if (docSnap.exists) {
+        // JIKA SUDAH ADA DI PANEL ADMIN / FIRESTORE -> GUNAKAN DATA TERSEBUT
+        const dataExist = docSnap.data();
+        bbfs = dataExist.bbfs || "LIBUR";
+        jamInfo = { tutup: dataExist.jamTutup || "- WIB", result: dataExist.jamResult || "- WIB" };
+
+        details = {
+          cb: dataExist.colokBebas || dataExist.colok_bebas || '-',
+          cm: dataExist.colokMacau || dataExist.colok_macau || '-',
+          shio: dataExist.shio || '-',
+          twin: dataExist.twin || '-',
+          d2: dataExist.d2 || '-',
+          d3: dataExist.d3 || '-',
+          d4: dataExist.d4 || '-',
+          d2Arr: typeof dataExist.d2 === 'string' ? dataExist.d2.split('*') : [],
+          d3Arr: typeof dataExist.d3 === 'string' ? dataExist.d3.split('*') : [],
+          d4Arr: typeof dataExist.d4 === 'string' ? dataExist.d4.split('*') : []
+        };
+      } else {
+        // JIKA BELUM ADA DI FIRESTORE -> HANYA BARU DISINI GENERATE DENGAN BOT
+        const daysOff = JADWAL_OFF[pasaran] || [];
+        const isLibur = daysOff.includes(currentDayWIB);
+
+        bbfs = isLibur ? "LIBUR" : generateBBFS();
+        details = generatePredictionDetails(bbfs);
+        jamInfo = JADWAL_JAM[pasaran] || { tutup: "- WIB", result: "- WIB" };
+
+        const payload = {
+          pasaran, 
+          tanggal: tanggalWIB, 
+          bbfs,
+          jamTutup: jamInfo.tutup, 
+          jamResult: jamInfo.result,
+          colokBebas: details.cb, 
+          colok_bebas: details.cb,
+          colokMacau: details.cm, 
+          colok_macau: details.cm,
+          shio: details.shio, 
+          twin: details.twin,
+          d2: details.d2, 
+          d3: details.d3, 
+          d4: details.d4,
+          createdBy: "BOT_AUTOMATION",
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        };
+
+        batch.set(prediksiRef.doc(docId), payload, { merge: true });
+      }
 
       const itemData = { pasaran, bbfs, details };
       allPredictionsMap[pasaran] = itemData;
@@ -449,16 +475,16 @@ async function runBot() {
       }
     }
 
-    // 1. SIMPAN KE FIRESTORE
+    // 1. SIMPAN/UPDATE BATCH JIKA ADA PASARAN BARU
     await batch.commit();
-    console.log(`[BOT] ✅ Firestore & History Panel berhasil diperbarui.`);
+    console.log(`[BOT] ✅ Firestore & History Panel terverifikasi sinkron.`);
 
-    // 2. KIRIM TEKS KE TELEGRAM (Menggunakan Data Prediksi yang Sama)
+    // 2. KIRIM TEKS KE TELEGRAM (Menggunakan Data Terdaftar)
     for (const pasaran of DAFTAR_PASARAN) {
       const pred = allPredictionsMap[pasaran];
       const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, pred.bbfs, pred.details);
       await sendTelegramTextMessage(textMsg);
-      await delay(300);
+      await delay(100);
     }
     console.log(`[BOT] ✅ Seluruh teks 18 pasaran terkirim ke Telegram.`);
 
@@ -482,7 +508,7 @@ async function runBot() {
     for (const item of renderedBanners) {
       await sendTelegramBannerPhoto(item.buffer, captionBase);
       console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim.`);
-      await delay(1500);
+      await delay(500);
     }
 
   } catch (error) {
