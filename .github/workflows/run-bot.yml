@@ -1,9 +1,7 @@
 name: Bot Auto Runner
 
 on:
-  schedule:
-    # Setel ke jam 01:00 WIB (18:00 UTC)
-    - cron: '0 18 * * *'
+  # 'schedule' (cron) dihapus agar tidak berjalan otomatis tiap pergantian hari
   workflow_dispatch:
   repository_dispatch:
     types: [run-bot-manual]
@@ -26,6 +24,9 @@ jobs:
 
       - name: Install Dependencies
         run: npm install
+
+      - name: Install Puppeteer Browsers
+        run: npx puppeteer browsers install chrome
 
       - name: Run Bot Script
         env:
