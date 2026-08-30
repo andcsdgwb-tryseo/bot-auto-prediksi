@@ -103,7 +103,7 @@ function getDayOfWeekWIB() {
 }
 
 // ==========================================
-// 4. RANDOM GENERATOR PREDIKSI
+// 4. RANDOM GENERATOR PREDIKSI (DIPERBAIKI)
 // ==========================================
 function generateBBFS() {
   const digits = [];
@@ -114,22 +114,19 @@ function generateBBFS() {
   return digits.join('');
 }
 
-function getRandomDigitComboArr(bbfsArr, digitLength, count) {
-  const results = new Set();
-  let attempts = 0;
-
-  while (results.size < count && attempts < 100) {
-    attempts++;
-    // Ambil digit secara acak dari bbfsArr
-    let combo = '';
-    for (let i = 0; i < digitLength; i++) {
-      const randomIndex = Math.floor(Math.random() * bbfsArr.length);
-      combo += bbfsArr[randomIndex];
-    }
-    results.add(combo);
+// Helper untuk mengacak isi array secara acak (Fisher-Yates Algorithm)
+function shuffleArray(array) {
+  let arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
   }
+  return arr;
+}
 
-  return Array.from(results);
+// Helper untuk mengambil 1 karakter acak dari string BBFS
+function getRandomChar(str) {
+  return str[Math.floor(Math.random() * str.length)];
 }
 
 function generatePredictionDetails(bbfsStr) {
@@ -143,18 +140,54 @@ function generatePredictionDetails(bbfsStr) {
     };
   }
 
-  const arr = bbfsStr.split('');
-  const cb = arr[0];
-  const cm = `${arr[0]} / ${arr[1]}`;
+  const digits = bbfsStr.split(''); // Array 5 digit BBFS
+
+  // 1. COLOK BEBAS (Ambil 1 angka acak dari BBFS)
+  const cb = getRandomChar(bbfsStr);
+
+  // 2. COLOK MACAU (Ambil 2 digit posisi acak dari BBFS)
+  const macauDigits = shuffleArray(digits).slice(0, 2);
+  const cm = `${macauDigits[0]} / ${macauDigits[1]}`;
+
+  // 3. SHIO HARI INI
   const shio = DAFTAR_SHIO[Math.floor(Math.random() * DAFTAR_SHIO.length)];
-  const twin = `${arr[0]}${arr[0]} / ${arr[1]}${arr[1]}`;
-  
-  const d2Arr = [
-    `${arr[0]}${arr[1]}`, `${arr[1]}${arr[2]}`, `${arr[2]}${arr[3]}`, 
-    `${arr[3]}${arr[4]}`, `${arr[0]}${arr[4]}`
-  ];
-  const d3Arr = getRandomDigitComboArr(arr, 3, 4);
-  const d4Arr = getRandomDigitComboArr(arr, 4, 4);
+
+  // 4. ANGKA TWIN (Ambil 2 digit acak dari BBFS lalu dikembarkan)
+  const twinDigits = shuffleArray(digits).slice(0, 2);
+  const twin = `${twinDigits[0]}${twinDigits[0]} / ${twinDigits[1]}${twinDigits[1]}`;
+
+  // 5. ANGKA MAIN 2D (5 Pasang Acak Variasi Non-Kembar dari BBFS)
+  const set2D = new Set();
+  let attempts2D = 0;
+  while (set2D.size < 5 && attempts2D < 100) {
+    attempts2D++;
+    let d1 = getRandomChar(bbfsStr);
+    let d2 = getRandomChar(bbfsStr);
+    if (d1 !== d2) {
+      set2D.add(`${d1}${d2}`);
+    }
+  }
+  const d2Arr = Array.from(set2D);
+
+  // 6. ANGKA MAIN 3D (4 Variasi Kombinasi 3 Digit Acak dari BBFS)
+  const set3D = new Set();
+  let attempts3D = 0;
+  while (set3D.size < 4 && attempts3D < 100) {
+    attempts3D++;
+    let combo = getRandomChar(bbfsStr) + getRandomChar(bbfsStr) + getRandomChar(bbfsStr);
+    set3D.add(combo);
+  }
+  const d3Arr = Array.from(set3D);
+
+  // 7. ANGKA MAIN 4D (4 Variasi Kombinasi 4 Digit Acak dari BBFS)
+  const set4D = new Set();
+  let attempts4D = 0;
+  while (set4D.size < 4 && attempts4D < 100) {
+    attempts4D++;
+    let combo = getRandomChar(bbfsStr) + getRandomChar(bbfsStr) + getRandomChar(bbfsStr) + getRandomChar(bbfsStr);
+    set4D.add(combo);
+  }
+  const d4Arr = Array.from(set4D);
 
   return { 
     cb, cm, shio, twin, 
@@ -187,7 +220,7 @@ function formatTelegramMessage(pasaran, tanggal, bbfs, details) {
          `🎲 <b>3D:</b> <code>${details.d3}</code>\n` +
          `🎲 <b>4D:</b> <code>${details.d4}</code>\n` +
          `----------------------------------\n` +
-         `✅ <i>Prediksi Otomatis Diterbitkan!</i>`;
+         `✅ <i>Prediksi Mbah Sugeng Telah Di Terbitkan!</i>`;
 }
 
 function sendTelegramTextMessage(textMessage) {
@@ -425,15 +458,15 @@ async function runBot() {
   console.log(`[BOT] Memulai otomatisasi tanggal: ${tanggalWIB} (${tanggalFormatted})`);
 
   try {
-  const botConfigDoc = await db.collection('settings').doc('bot_control').get();
-  
-  // Hanya batalkan JIKA dokumen ada DAN nilai active secara eksplisit bernilai false
-  if (botConfigDoc.exists && botConfigDoc.data().active === false) {
-    console.log("[BOT] Status bot OFF. Eksekusi dibatalkan.");
-    return;
-  }
-  
-  console.log("[BOT] Status bot ON. Melanjutkan eksekusi...");
+    const botConfigDoc = await db.collection('settings').doc('bot_control').get();
+    
+    // Hanya batalkan JIKA dokumen ada DAN nilai active secara eksplisit bernilai false
+    if (botConfigDoc.exists && botConfigDoc.data().active === false) {
+      console.log("[BOT] Status bot OFF. Eksekusi dibatalkan.");
+      return;
+    }
+    
+    console.log("[BOT] Status bot ON. Melanjutkan eksekusi...");
 
     const batch = db.batch();
     const prediksiRef = db.collection('prediksi');
