@@ -1,7 +1,7 @@
 const admin = require('firebase-admin');
 const https = require('https');
-const fs = require('fs'); // FIXED: Tambahkan require('fs') agar tidak crash saat cek template
-const { createCanvas, loadImage } = require('canvas');
+const fs = require('fs');
+const puppeteer = require('puppeteer'); // DIGANTI: Menggunakan puppeteer (bukan Canvas)
 const FormData = require('form-data');
 const path = require('path');
 
@@ -103,7 +103,7 @@ function getDayOfWeekWIB() {
 }
 
 // ==========================================
-// 4. RANDOM GENERATOR PREDIKSI (DIPERBAIKI)
+// 4. RANDOM GENERATOR PREDIKSI
 // ==========================================
 function generateBBFS() {
   const digits = [];
@@ -114,7 +114,6 @@ function generateBBFS() {
   return digits.join('');
 }
 
-// Helper untuk mengacak isi array secara acak (Fisher-Yates Algorithm)
 function shuffleArray(array) {
   let arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -124,7 +123,6 @@ function shuffleArray(array) {
   return arr;
 }
 
-// Helper untuk mengambil 1 karakter acak dari string BBFS
 function getRandomChar(str) {
   return str[Math.floor(Math.random() * str.length)];
 }
@@ -140,36 +138,25 @@ function generatePredictionDetails(bbfsStr) {
     };
   }
 
-  const digits = bbfsStr.split(''); // Array 5 digit BBFS
+  const digits = bbfsStr.split('');
 
-  // 1. COLOK BEBAS (Ambil 1 angka acak dari BBFS)
   const cb = getRandomChar(bbfsStr);
-
-  // 2. COLOK MACAU (Ambil 2 digit posisi acak dari BBFS)
   const macauDigits = shuffleArray(digits).slice(0, 2);
   const cm = `${macauDigits[0]} / ${macauDigits[1]}`;
-
-  // 3. SHIO HARI INI
   const shio = DAFTAR_SHIO[Math.floor(Math.random() * DAFTAR_SHIO.length)];
-
-  // 4. ANGKA TWIN (Ambil 2 digit acak dari BBFS lalu dikembarkan)
   const twinDigits = shuffleArray(digits).slice(0, 2);
   const twin = `${twinDigits[0]}${twinDigits[0]} / ${twinDigits[1]}${twinDigits[1]}`;
 
-  // 5. ANGKA MAIN 2D (5 Pasang Acak Variasi Non-Kembar dari BBFS)
   const set2D = new Set();
   let attempts2D = 0;
   while (set2D.size < 5 && attempts2D < 100) {
     attempts2D++;
     let d1 = getRandomChar(bbfsStr);
     let d2 = getRandomChar(bbfsStr);
-    if (d1 !== d2) {
-      set2D.add(`${d1}${d2}`);
-    }
+    if (d1 !== d2) set2D.add(`${d1}${d2}`);
   }
   const d2Arr = Array.from(set2D);
 
-  // 6. ANGKA MAIN 3D (4 Variasi Kombinasi 3 Digit Acak dari BBFS)
   const set3D = new Set();
   let attempts3D = 0;
   while (set3D.size < 4 && attempts3D < 100) {
@@ -179,7 +166,6 @@ function generatePredictionDetails(bbfsStr) {
   }
   const d3Arr = Array.from(set3D);
 
-  // 7. ANGKA MAIN 4D (4 Variasi Kombinasi 4 Digit Acak dari BBFS)
   const set4D = new Set();
   let attempts4D = 0;
   while (set4D.size < 4 && attempts4D < 100) {
@@ -260,129 +246,81 @@ function sendTelegramTextMessage(textMessage) {
 }
 
 // ==========================================
-// 6. CANVAS RENDERER PRESISI & JELAS
+// 6. PUPPETEER BANNER RENDERER (DIPERBAIKI)
 // ==========================================
-async function drawGroupBanner(groupDataArray, templatePath, tanggalFormatted) {
-  const fullPath = path.resolve(templatePath);
+async function drawGroupBanner(groupDataArray, templateHtmlPath, tanggalFormatted) {
+  const fullPath = path.resolve(templateHtmlPath);
   
   if (!fs.existsSync(fullPath)) {
-    throw new Error(`File template tidak ditemukan di: ${fullPath}`);
+    throw new Error(`File template HTML tidak ditemukan di: ${fullPath}`);
   }
 
-  const image = await loadImage(fullPath);
-
-  const canvas = createCanvas(image.width, image.height);
-  const ctx = canvas.getContext('2d');
-
-  // Gambar latar template dasar
-  ctx.drawImage(image, 0, 0, image.width, image.height);
-
-  // Skala responsif terhadap canvas asli (1024x1280)
-  const sx = image.width / 1024;
-  const sy = image.height / 1280;
-
-  const X = (v) => v * sx;
-  const Y = (v) => v * sy;
-
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  // 1. TANGGAL HEADER (Di Kotak Hitam Atas)
-  ctx.font = `bold ${Math.round(22 * sy)}px Arial, sans-serif`;
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(tanggalFormatted || '', X(438), Y(92));
-
-  // Jarak Horisontal Panel Kiri ke Panel Kanan (SINGAPORE -> MALAYSIA)
-  const RIGHT_SHIFT = 373;
-
-  // KOORDINAT HORIZONTAL (X) PANEL KIRI (CENTER POINT PER SEKTOR)
-  const LEFT = {
-    bbfs: 260,                       // Posisi tengah untuk 5 Digit BBFS
-    cm: 80,                          // Posisi bawah CM
-    cb: 188,                         // Posisi bawah CB
-    twin: 305,                       // Posisi bawah TWIN
-    top2d: [62, 124, 186, 248, 310], // 5 Kolom TOP 2D
-    top3d: [62, 146, 230, 314],      // 4 Kolom TOP 3D
-    top4d: [62, 146, 230, 314]       // 4 Kolom TOP 4D
-  };
-
-  // KOORDINAT VERTIKAL (Y) TIAP BARIS PASARAN (DIPERBAIKI AGAR PAS PADA SLOT KOSONG)
-  const ROWS = [
-    // Baris 1: SINGAPORE / MALAYSIA
-    { bbfs: 236, small: 398, top2d: 280, top3d: 334, top4d: 388 },
-    // Baris 2: MACAU / BUSAN NIGHT
-    { bbfs: 494, small: 656, top2d: 538, top3d: 592, top4d: 646 },
-    // Baris 3: QATAR / HONGKONG
-    { bbfs: 752, small: 914, top2d: 796, top3d: 850, top4d: 904 }
-  ];
-
-  groupDataArray.slice(0, 6).forEach((item, index) => {
-    const rowIndex = Math.floor(index / 2);
-    const isRight = index % 2 === 1;
-
-    const row = ROWS[rowIndex];
-    if (!row) return;
-
-    const shiftX = isRight ? RIGHT_SHIFT : 0;
-    const isLibur = item?.bbfs === "LIBUR";
-    const details = item?.details || {};
-
-    // STATUS LIBUR
-    if (isLibur) {
-      ctx.fillStyle = '#FF3333';
-      ctx.font = `bold ${Math.round(26 * sy)}px Arial, sans-serif`;
-      ctx.fillText("PASARAN LIBUR", X(188 + shiftX), Y(row.top3d));
-      return;
-    }
-
-    // Format BBFS 5 Digit dengan Spasi (contoh: "3  6  8  5  1")
-    const rawBbfs = String(item?.bbfs || '').replace(/\D/g, '').slice(0, 5);
-    const bbfsFormatted = rawBbfs.split('').join('  ');
-
-    // A. BBFS 5 DIGIT (Putih Tajam & Pas Slot Header)
-    ctx.fillStyle = '#00FFFF'; // Cyan Neon agar kontras & jelas
-    ctx.font = `bold ${Math.round(16 * sy)}px Arial, sans-serif`;
-    ctx.fillText(bbfsFormatted, X(LEFT.bbfs + shiftX), Y(row.bbfs));
-
-    // B. CM, CB, TWIN (Tercetak Rapi di Bawah Slot)
-    ctx.fillStyle = '#FFD700'; // Kuning Emas
-    ctx.font = `bold ${Math.round(13 * sy)}px Arial, sans-serif`;
-    ctx.fillText(String(details.cm || '-'), X(LEFT.cm + shiftX), Y(row.small));
-    ctx.fillText(String(details.cb || '-'), X(LEFT.cb + shiftX), Y(row.small));
-    ctx.fillText(String(details.twin || '-'), X(LEFT.twin + shiftX), Y(row.small));
-
-    // C. TOP 2D (Hijau Tosca Pas di Slot)
-    ctx.fillStyle = '#00FFCC';
-    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
-    const d2 = Array.isArray(details.d2Arr) ? details.d2Arr.slice(0, 5) : [];
-    d2.forEach((value, i) => {
-      if (LEFT.top2d[i] !== undefined && value !== undefined) {
-        ctx.fillText(String(value), X(LEFT.top2d[i] + shiftX), Y(row.top2d));
-      }
-    });
-
-    // D. TOP 3D (Kuning Terang Pas di Slot)
-    ctx.fillStyle = '#FFFF00';
-    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
-    const d3 = Array.isArray(details.d3Arr) ? details.d3Arr.slice(0, 4) : [];
-    d3.forEach((value, i) => {
-      if (LEFT.top3d[i] !== undefined && value !== undefined) {
-        ctx.fillText(String(value), X(LEFT.top3d[i] + shiftX), Y(row.top3d));
-      }
-    });
-
-    // E. TOP 4D (Merah Coral/Pink Bright Pas di Slot)
-    ctx.fillStyle = '#FF66AA';
-    ctx.font = `bold ${Math.round(14 * sy)}px Arial, sans-serif`;
-    const d4 = Array.isArray(details.d4Arr) ? details.d4Arr.slice(0, 4) : [];
-    d4.forEach((value, i) => {
-      if (LEFT.top4d[i] !== undefined && value !== undefined) {
-        ctx.fillText(String(value), X(LEFT.top4d[i] + shiftX), Y(row.top4d));
-      }
-    });
+  // Buka Headless Browser (Chrome) via Puppeteer
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
-  return canvas.toBuffer('image/png');
+  const page = await browser.newPage();
+  await page.setViewport({ width: 1024, height: 1280, deviceScaleFactor: 2 });
+  
+  // Buka file template HTML lokal
+  await page.goto(`file://${fullPath}`, { waitUntil: 'networkidle0' });
+
+  // Inject Data ke Elemen HTML
+  await page.evaluate((dataArray, tgl, mapDisplay) => {
+    // 1. Set Tanggal Header
+    const dateBox = document.querySelector('.date-box');
+    if (dateBox) dateBox.innerText = tgl;
+
+    // 2. Set Data 6 Pasaran
+    const cards = document.querySelectorAll('.card-pasaran');
+    
+    dataArray.slice(0, 6).forEach((item, index) => {
+      const card = cards[index];
+      if (!card) return;
+
+      const namaDisplay = mapDisplay[item.pasaran] || item.pasaran;
+
+      // Update Judul Pasaran
+      const titleElem = card.querySelector('.pasaran-title');
+      if (titleElem) titleElem.innerText = namaDisplay;
+
+      const isLibur = item?.bbfs === "LIBUR";
+      const details = item?.details || {};
+
+      if (isLibur) {
+        card.innerHTML = `
+          <div class="pasaran-title">${namaDisplay}</div>
+          <div style="color: #ff3333; font-size: 24px; font-weight: bold; text-align: center; margin: auto 0;">
+            PASARAN LIBUR
+          </div>
+        `;
+        return;
+      }
+
+      // Format BBFS 5 digit
+      const rawBbfs = String(item?.bbfs || '').replace(/\D/g, '').slice(0, 5);
+      const bbfsFormatted = rawBbfs.split('').join('  ');
+
+      const slots = card.querySelectorAll('.slot-area');
+      
+      if (slots[0]) slots[0].innerText = bbfsFormatted;
+      if (slots[1]) slots[1].innerText = details.cm || '-';
+      if (slots[2]) slots[2].innerText = details.cb || '-';
+      if (slots[3]) slots[3].innerText = details.twin || '-';
+      if (slots[4]) slots[4].innerText = (details.d2Arr || []).join('  ');
+      if (slots[5]) slots[5].innerText = (details.d3Arr || []).join('  ');
+      if (slots[6]) slots[6].innerText = (details.d4Arr || []).join('  ');
+    });
+  }, groupDataArray, tanggalFormatted, MAP_NAMA_DISPLAY);
+
+  // Ambil Screenshot elemen banner
+  const bannerElement = await page.$('.banner-container');
+  const imageBuffer = await bannerElement.screenshot({ type: 'png' });
+
+  await browser.close();
+  return imageBuffer;
 }
 
 function sendTelegramBannerPhoto(photoBuffer, captionText) {
@@ -446,7 +384,7 @@ function sendTelegramBannerPhoto(photoBuffer, captionText) {
 }
 
 // ==========================================
-// 7. EKSEKUSI UTAMA (MAIN BOT FUNCTION)
+// 7. EKSEKUSI UTAMA (MAIN BOT FUNCTION - DIPERBAIKI)
 // ==========================================
 async function runBot() {
   const tanggalWIB = getTodayWIB();
@@ -458,7 +396,6 @@ async function runBot() {
   try {
     const botConfigDoc = await db.collection('settings').doc('bot_control').get();
     
-    // Hanya batalkan JIKA dokumen ada DAN nilai active secara eksplisit bernilai false
     if (botConfigDoc.exists && botConfigDoc.data().active === false) {
       console.log("[BOT] Status bot OFF. Eksekusi dibatalkan.");
       return;
@@ -509,7 +446,6 @@ async function runBot() {
       const docId = `${tanggalWIB}_${pasaran.replace(/\s+/g, '')}`;
       batch.set(prediksiRef.doc(docId), payload, { merge: true });
 
-      // Kelompokkan data gambar
       const itemData = { pasaran, bbfs, details };
       const normP = normalize(pasaran);
 
@@ -522,11 +458,11 @@ async function runBot() {
       }
     }
 
-    // 1. SIMPAN KE FIRESTORE TERLEBIH DAHULU (AGAR HISTORY & PLAYER.HTML LANGSUNG TERISI)
+    // 1. SIMPAN KE FIRESTORE
     await batch.commit();
     console.log(`[BOT] ✅ Firestore & History Panel berhasil diperbarui.`);
 
-    // 2. KIRIM TEKS KE TELEGRAM DENGAN JEDA (DELAY) 300ms AGAR TIDAK KENA RATE-LIMIT
+    // 2. KIRIM TEKS KE TELEGRAM
     for (const pasaran of DAFTAR_PASARAN) {
       const daysOff = JADWAL_OFF[pasaran] || [];
       const isLibur = daysOff.includes(currentDayWIB);
@@ -535,7 +471,7 @@ async function runBot() {
 
       const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, bbfs, details);
       await sendTelegramTextMessage(textMsg);
-      await delay(300); // Jeda aman Telegram
+      await delay(300);
     }
     console.log(`[BOT] ✅ Seluruh teks 18 pasaran terkirim ke Telegram.`);
 
@@ -545,10 +481,13 @@ async function runBot() {
                         `⚡ Prediksi tajam, pilihan terbaik, dan jadwal lengkap berbagai pasaran.\n\n` +
                         `✨ Cek angka pilihanmu dan tetap bermain secara bijak.`;
 
-    // 3. PROSES BANNER GAMBAR
+    // Path mengarah ke template.html yang ada di folder botprediksi
+    const templateHtmlPath = path.join(__dirname, 'template.html');
+
+    // 3. PROSES BANNER GAMBAR VIA PUPPETEER
     if (group1Data.length > 0) {
       try {
-        const buffer1 = await drawGroupBanner(group1Data, path.join(__dirname, 'template-pasaran-1.jpg'), tanggalFormatted);
+        const buffer1 = await drawGroupBanner(group1Data, templateHtmlPath, tanggalFormatted);
         await sendTelegramBannerPhoto(buffer1, captionBase);
         console.log(`[TELEGRAM] ✅ Banner Pasaran 1 terkirim.`);
       } catch (e) {
@@ -559,7 +498,7 @@ async function runBot() {
 
     if (group2Data.length > 0) {
       try {
-        const buffer2 = await drawGroupBanner(group2Data, path.join(__dirname, 'template-pasaran-2.jpg'), tanggalFormatted);
+        const buffer2 = await drawGroupBanner(group2Data, templateHtmlPath, tanggalFormatted);
         await sendTelegramBannerPhoto(buffer2, captionBase);
         console.log(`[TELEGRAM] ✅ Banner Pasaran 2 terkirim.`);
       } catch (e) {
@@ -570,7 +509,7 @@ async function runBot() {
 
     if (macauGroupData.length > 0) {
       try {
-        const buffer3 = await drawGroupBanner(macauGroupData, path.join(__dirname, 'template-totomacau.jpg'), tanggalFormatted);
+        const buffer3 = await drawGroupBanner(macauGroupData, templateHtmlPath, tanggalFormatted);
         await sendTelegramBannerPhoto(buffer3, captionBase);
         console.log(`[TELEGRAM] ✅ Banner Toto Macau terkirim.`);
       } catch (e) {
