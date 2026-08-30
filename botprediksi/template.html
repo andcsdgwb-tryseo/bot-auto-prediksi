@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Template Prediksi Target4D</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Arial', sans-serif;
+    }
+
+    body {
+      background-color: #050505;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    /* Ukuran Canvas Standar Bot (1024 x 1280 px) */
+    .banner-container {
+      width: 1024px;
+      min-height: 1280px;
+      
+      /* BACKGROUND PURE CSS */
+      background-color: #0d0e12;
+      background-image: 
+        radial-gradient(circle at 50% 30%, rgba(212, 175, 55, 0.15) 0%, transparent 60%),
+        radial-gradient(circle at 50% 100%, rgba(255, 215, 0, 0.08) 0%, transparent 50%),
+        radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 18px 18px;
+      
+      border: 4px solid #2a91cc;
+      border-radius: 6px;
+      position: relative;
+      padding: 30px;
+      color: #fff;
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(212, 175, 55, 0.15);
+    }
+
+    /* Header Banner */
+    .header {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+
+    .header h1 {
+      font-size: 42px;
+      color: #2a91cc;
+      text-shadow: 0 0 12px 2a91cc(255, 215, 0, 0.6), 0 3px 6px rgba(0, 0, 0, 0.9);
+      letter-spacing: 3px;
+    }
+
+    .date-box {
+      width: 400px;
+      height: 45px;
+      margin: 12px auto 0 auto;
+      border: 2px solid #2a91cc;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: bold;
+      color: #ffffff;
+      box-shadow: inset 0 0 10px rgba(255, 215, 0, 0.25);
+    }
+
+    /* Grid 6 Pasaran */
+    .grid-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    /* Kartu Pasaran */
+    .card-pasaran {
+      background: linear-gradient(145deg, rgba(25, 27, 34, 0.9), rgba(15, 16, 20, 0.95));
+      border: 1.5px solid rgba(212, 175, 55, 0.4);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.6);
+    }
+
+    .pasaran-title {
+      font-size: 22px;
+      font-weight: bold;
+      color: #00e1ff;
+      border-bottom: 2px solid #ff00ff;
+      padding-bottom: 6px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+      text-align: center; /* Judul Pasaran juga dibuat ke tengah */
+    }
+
+    /* Section Slot */
+    .section-box {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .label-title {
+      font-size: 13px;
+      color: #ddd;
+      font-weight: bold;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-align: center; /* Mengetengahkan tulisan label (BBFS, TOP 2D, dll) */
+    }
+
+    .slot-area {
+      height: 34px;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px dashed rgba(255, 215, 0, 0.5);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      color: #fff;
+      text-align: center; /* Mengetengahkan teks angka bot di dalam slot */
+    }
+
+    /* Layout Khusus CM, CB, TWIN */
+    .mini-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="banner-container">
+    <div class="header">
+      <h1>PREDIKSI TARGET4D</h1>
+      <div class="date-box"></div>
+    </div>
+
+    <div class="grid-container">
+      <script>
+        const pasaranList = ["SINGAPORE", "MALAYSIA", "MACAU", "BUSAN NIGHT", "QATAR", "HONGKONG"];
+        
+        pasaranList.forEach(name => {
+          document.write(`
+            <div class="card-pasaran">
+              <div class="pasaran-title">${name}</div>
+              
+              <div class="section-box">
+                <div class="label-title">BBFS 5 DIGIT</div>
+                <div class="slot-area"></div>
+              </div>
+
+              <div class="mini-group">
+                <div class="section-box">
+                  <div class="label-title">CM</div>
+                  <div class="slot-area"></div>
+                </div>
+                <div class="section-box">
+                  <div class="label-title">CB</div>
+                  <div class="slot-area"></div>
+                </div>
+                <div class="section-box">
+                  <div class="label-title">TWIN</div>
+                  <div class="slot-area"></div>
+                </div>
+              </div>
+
+              <div class="section-box">
+                <div class="label-title">TOP 2D</div>
+                <div class="slot-area"></div>
+              </div>
+
+              <div class="section-box">
+                <div class="label-title">TOP 3D</div>
+                <div class="slot-area"></div>
+              </div>
+
+              <div class="section-box">
+                <div class="label-title">TOP 4D</div>
+                <div class="slot-area"></div>
+              </div>
+            </div>
+          `);
+        });
+      </script>
+    </div>
+  </div>
+
+</body>
+</html>
