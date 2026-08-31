@@ -147,9 +147,8 @@
       flex-direction: column;
     }
 
-    /* LABEL DITERANGKAN & DIPERBESAR */
     .label-title {
-      font-size: 15px; /* Dari 12px ke 15px */
+      font-size: 15px;
       color: #b2cced;
       font-weight: 900;
       margin-bottom: 3px;
@@ -184,7 +183,6 @@
   </style>
 
   <script>
-    // Fungsi bantuan render kartu pasaran
     function renderPasaran(list) {
       list.forEach(name => {
         document.write(`
@@ -245,7 +243,7 @@
     </div>
     <div class="grid-container">
       <script>
-        renderPasaran(["SINGAPORE", "MALAYSIA", "MACAU", "BUSAN NIGHT", "QATAR", "HONGKONG"]);
+        renderPasaran(["SINGAPORE", "MALAYSIA", "MACAU", "BUSANNIGHT", "QATAR", "HONGKONG"]);
       </script>
     </div>
   </div>
@@ -279,7 +277,8 @@
     </div>
     <div class="grid-container">
       <script>
-        renderPasaran(["TOTO MACAU 1300", "TOTO MACAU 1600", "TOTO MACAU 1900", "TOTO MACAU 2200", "TOTO MACAU 2300", "TOTO MACAU 0000"]);
+        /* URUTAN DIBUAT TOTO MACAU 0000 PERTAMA KALI DAN 2300 TERAKHIR */
+        renderPasaran(["TOTO MACAU 0000", "TOTO MACAU 1300", "TOTO MACAU 1600", "TOTO MACAU 1900", "TOTO MACAU 2200", "TOTO MACAU 2300"]);
       </script>
     </div>
   </div>
