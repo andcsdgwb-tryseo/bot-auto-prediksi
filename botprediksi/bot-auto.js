@@ -33,7 +33,7 @@ const TELEGRAM_TOPIC_GAMBAR_2_ID = process.env.TELEGRAM_TOPIC_GAMBAR_2_ID || 587
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Urutan Presisi 18 Pasaran (TOTO MACAU 00 di awal, TOTO MACAU 23 di akhir)
+// Urutan Presisi 18 Pasaran
 const DAFTAR_PASARAN = [
   "TOTOWUHAN", "HKSIANG", "SYDNEY4D", "TAIPEI", "SGMETRO", "BUSANDAY",
   "SINGAPORE", "MALAYSIA", "MACAU", "BUSANNIGHT", "QATAR", "HONGKONG",
@@ -144,7 +144,6 @@ function generatePredictionDetails(bbfsStr) {
   }
 
   const digits = bbfsStr.split('');
-
   const cb = getRandomChar(bbfsStr);
   const macauDigits = shuffleArray(digits).slice(0, 2);
   const cm = `${macauDigits[0]} / ${macauDigits[1]}`;
@@ -160,7 +159,6 @@ function generatePredictionDetails(bbfsStr) {
     let d2 = getRandomChar(bbfsStr);
     if (d1 !== d2) set2D.add(`${d1}${d2}`);
   }
-  const d2Arr = Array.from(set2D);
 
   const set3D = new Set();
   let attempts3D = 0;
@@ -169,7 +167,6 @@ function generatePredictionDetails(bbfsStr) {
     let combo = getRandomChar(bbfsStr) + getRandomChar(bbfsStr) + getRandomChar(bbfsStr);
     set3D.add(combo);
   }
-  const d3Arr = Array.from(set3D);
 
   const set4D = new Set();
   let attempts4D = 0;
@@ -178,14 +175,15 @@ function generatePredictionDetails(bbfsStr) {
     let combo = getRandomChar(bbfsStr) + getRandomChar(bbfsStr) + getRandomChar(bbfsStr) + getRandomChar(bbfsStr);
     set4D.add(combo);
   }
-  const d4Arr = Array.from(set4D);
 
   return { 
     cb, cm, shio, twin, 
-    d2Arr, d3Arr, d4Arr,
-    d2: d2Arr.join('*'),
-    d3: d3Arr.join('*'),
-    d4: d4Arr.join('*')
+    d2Arr: Array.from(set2D), 
+    d3Arr: Array.from(set3D), 
+    d4Arr: Array.from(set4D),
+    d2: Array.from(set2D).join('*'),
+    d3: Array.from(set3D).join('*'),
+    d4: Array.from(set4D).join('*')
   };
 }
 
@@ -214,7 +212,6 @@ function formatTelegramMessage(pasaran, tanggal, bbfs, details) {
          `✅ <i>Prediksi Mbah Sugeng Telah Di Terbitkan!</i>`;
 }
 
-// Kirim Teks
 function sendTelegramTextMessage(textMessage, targetChatId = null, targetTopicId = null) {
   return new Promise((resolve) => {
     const chatId = targetChatId || TELEGRAM_CHAT_ID;
@@ -228,12 +225,9 @@ function sendTelegramTextMessage(textMessage, targetChatId = null, targetTopicId
       parse_mode: 'HTML'
     };
 
-    if (topicId) {
-      payload.message_thread_id = topicId;
-    }
+    if (topicId) payload.message_thread_id = topicId;
 
     const postData = JSON.stringify(payload);
-
     const options = {
       hostname: 'api.telegram.org',
       path: `/bot${TELEGRAM_TOKEN}/sendMessage`,
@@ -259,8 +253,8 @@ function sendTelegramTextMessage(textMessage, targetChatId = null, targetTopicId
   });
 }
 
-// Kirim Gambar + Caption + Button
-function sendTelegramBannerPhoto(photoBuffer, captionText, targetChatId = null, targetTopicId = null) {
+// KIRIM GAMBAR DENGAN DUKUNGAN FILE_ID ATAU BUFFER
+function sendTelegramBannerPhoto(photoSource, captionText, targetChatId = null, targetTopicId = null) {
   return new Promise((resolve) => {
     const chatId = targetChatId || TELEGRAM_CHAT_ID;
     const topicId = targetTopicId || TELEGRAM_TOPIC_GAMBAR_ID;
@@ -270,7 +264,6 @@ function sendTelegramBannerPhoto(photoBuffer, captionText, targetChatId = null, 
       return resolve(null);
     }
 
-    const form = new FormData();
     const replyMarkup = {
       inline_keyboard: [
         [{ text: "🛡️ LINK UTAMA TARGET4D", url: "https://t4dtop.com/1" }],
@@ -283,35 +276,72 @@ function sendTelegramBannerPhoto(photoBuffer, captionText, targetChatId = null, 
       ]
     };
 
-    form.append('chat_id', chatId);
-    if (topicId) {
-      form.append('message_thread_id', topicId);
+    // OPSIONAL A: JIKA MENGGUNAKAN FILE_ID (SANGAT CEPAT - INSTAN)
+    if (typeof photoSource === 'string') {
+      const payload = {
+        chat_id: chatId,
+        photo: photoSource,
+        caption: captionText,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup
+      };
+      if (topicId) payload.message_thread_id = topicId;
+
+      const postData = JSON.stringify(payload);
+      const options = {
+        hostname: 'api.telegram.org',
+        path: `/bot${TELEGRAM_TOKEN}/sendPhoto`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      };
+
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => {
+          try { resolve(JSON.parse(body)); } catch (e) { resolve(null); }
+        });
+      });
+      req.on('error', () => resolve(null));
+      req.write(postData);
+      req.end();
+
+    } else {
+      // OPSIONAL B: JIKA MENGGUNAKAN BUFFER GAMBAR (UPLOAD FILE BARU)
+      const form = new FormData();
+      form.append('chat_id', chatId);
+      if (topicId) form.append('message_thread_id', topicId);
+
+      form.append('photo', photoSource, { filename: 'prediksi-banner.png' });
+      form.append('caption', captionText);
+      form.append('parse_mode', 'HTML');
+      form.append('reply_markup', JSON.stringify(replyMarkup));
+
+      const options = {
+        hostname: 'api.telegram.org',
+        path: `/bot${TELEGRAM_TOKEN}/sendPhoto`,
+        method: 'POST',
+        headers: form.getHeaders()
+      };
+
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => {
+          try { resolve(JSON.parse(body)); } catch (e) { resolve(null); }
+        });
+      });
+
+      req.on('error', (err) => {
+        console.error("[TELEGRAM ERROR - PHOTO]:", err.message);
+        resolve(null);
+      });
+
+      form.pipe(req);
     }
-
-    form.append('photo', photoBuffer, { filename: 'prediksi-banner.png' });
-    form.append('caption', captionText);
-    form.append('parse_mode', 'HTML');
-    form.append('reply_markup', JSON.stringify(replyMarkup));
-
-    const options = {
-      hostname: 'api.telegram.org',
-      path: `/bot${TELEGRAM_TOKEN}/sendPhoto`,
-      method: 'POST',
-      headers: form.getHeaders()
-    };
-
-    const req = https.request(options, (res) => {
-      let body = '';
-      res.on('data', (chunk) => body += chunk);
-      res.on('end', () => resolve(body));
-    });
-
-    req.on('error', (err) => {
-      console.error("[TELEGRAM ERROR - PHOTO]:", err.message);
-      resolve(null);
-    });
-
-    form.pipe(req);
   });
 }
 
@@ -328,13 +358,13 @@ async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tangga
     headless: "new",
     args: [
       '--no-sandbox', 
-      '--disable-setuid-sandbox',
-      '--force-device-scale-factor=3'
+      '--disable-setuid-sandbox'
     ]
   });
 
   const page = await browser.newPage();
-  await page.setViewport({ width: 1200, height: 1500, deviceScaleFactor: 3 });
+  // DIUBAH: deviceScaleFactor menjadi 2 agar ukuran file kecil dan render kencang
+  await page.setViewport({ width: 1200, height: 1500, deviceScaleFactor: 2 });
   await page.goto(`file://${fullPath}`, { waitUntil: 'networkidle0' });
 
   await page.evaluate((groups, tgl, mapDisplay) => {
@@ -417,7 +447,6 @@ async function runBot() {
 
     const batch = db.batch();
     const prediksiRef = db.collection('prediksi');
-
     const allPredictionsMap = {};
 
     // BACA / INPUT DATA FIRESTORE
@@ -487,9 +516,8 @@ async function runBot() {
       const pred = allPredictionsMap[pasaran];
       const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, pred.bbfs, pred.details);
       
-      // Kirim teks prediksi hanya ke Grup 1
       await sendTelegramTextMessage(textMsg, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_TEXT_ID);
-      await delay(100);
+      await delay(50); // Jeda diperkecil jadi 50ms
     }
     console.log(`[BOT] ✅ Seluruh teks 18 pasaran terkirim ke Grup Utama.`);
 
@@ -515,33 +543,40 @@ async function runBot() {
     ];
 
     console.log(`[BOT] Memulai render 3 banner...`);
-
     const renderedBanners = await renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tanggalFormatted);
 
     // ----------------------------------------------------
-    // PROSES 3: KIRIM GAMBAR + CAPTION + BUTTON KE GRUP 1 DAN GRUP 2
+    // PROSES 3: KIRIM GAMBAR (OPTIMASI TERCEPAT VIA FILE_ID)
     // ----------------------------------------------------
     for (const item of renderedBanners) {
-      // 1. Kirim ke Grup Utama (Grup 1)
+      // 1. Upload Buffer Ke Grup Utama
       const res1 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_GAMBAR_ID);
-      if (res1) {
+      
+      let fileId = null;
+      if (res1 && res1.ok && res1.result && res1.result.photo) {
+        // Ambil ID foto ukuran terbesar
+        const photos = res1.result.photo;
+        fileId = photos[photos.length - 1].file_id;
         console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup Utama.`);
       } else {
         console.error(`[TELEGRAM ERROR] ❌ Gagal kirim ${item.bannerId} ke Grup Utama.`);
       }
 
-      await delay(1000); // Jeda 1 detik sebelum kirim ke Grup 2
-
-      // 2. Kirim ke Grup Kedua (Grup 2)
-      const res2 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
-      if (res2) {
-        console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup 2.`);
+      // 2. Kirim Ke Grup 2 Menggunakan File ID (Instan)
+      if (fileId) {
+        const res2 = await sendTelegramBannerPhoto(fileId, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
+        if (res2 && res2.ok) {
+          console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup 2 (Instan via file_id).`);
+        }
       } else {
-        console.error(`[TELEGRAM ERROR] ❌ Gagal kirim ${item.bannerId} ke Grup 2.`);
+        // Fallback jika fileId gagal diambil
+        await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
       }
 
-      await delay(2500); // Jeda antar banner untuk cegah rate-limit Telegram
+      await delay(500); // Jeda singkat antar banner
     }
+
+    console.log("[BOT] ✅ SELURUH PROSES BERHASIL SELESAI!");
 
   } catch (error) {
     console.error("[BOT] ❌ Error Utama:", error);
