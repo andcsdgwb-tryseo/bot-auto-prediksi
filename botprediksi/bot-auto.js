@@ -21,15 +21,15 @@ const db = admin.firestore();
 // ==========================================
 // 2. KONFIGURASI TELEGRAM BOT & TOPIC ID
 // ==========================================
+// --- GRUP UTAMA (GRUP 1) ---
 const TELEGRAM_TOKEN           = process.env.TELEGRAM_TOKEN;
 const TELEGRAM_CHAT_ID         = process.env.TELEGRAM_CHAT_ID || "-1004474947415";
 const TELEGRAM_TOPIC_GAMBAR_ID = process.env.TELEGRAM_TOPIC_GAMBAR_ID || 27; // Topic: PREDIKSI GAMBAR TOGEL
 const TELEGRAM_TOPIC_TEXT_ID   = process.env.TELEGRAM_TOPIC_TEXT_ID || 29;   // Topic: ANGKA PREDIKSI
 
-// ===== TAMBAHAN: Konfigurasi Grup Kedua =====
+// --- GRUP KEDUA (GRUP 2) ---
 const TELEGRAM_CHAT_ID_2         = process.env.TELEGRAM_CHAT_ID_2 || "-1002005725423"; 
-const TELEGRAM_TOPIC_GAMBAR_2_ID = process.env.TELEGRAM_TOPIC_GAMBAR_2_ID || 58762;      
-
+const TELEGRAM_TOPIC_GAMBAR_2_ID = process.env.TELEGRAM_TOPIC_GAMBAR_2_ID || 58762;
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -51,7 +51,7 @@ const MAP_NAMA_DISPLAY = {
   "TOTOMACAU 23": "TOTO MACAU 2300"
 };
 
-// Kelompok Pasaran untuk 3 Template Banner (Sesuai Urutan Baru)
+// Kelompok Pasaran untuk 3 Template Banner
 const KELOMPOK_PASARAN_1 = ["SINGAPORE", "MALAYSIA", "MACAU", "BUSANNIGHT", "QATAR", "HONGKONG"];
 const KELOMPOK_PASARAN_2 = ["TOTOWUHAN", "HKSIANG", "SYDNEY4D", "TAIPEI", "SGMETRO", "BUSANDAY"];
 const KELOMPOK_MACAU      = ["TOTOMACAU 00", "TOTOMACAU 13", "TOTOMACAU 16", "TOTOMACAU 19", "TOTOMACAU 22", "TOTOMACAU 23"];
@@ -190,7 +190,7 @@ function generatePredictionDetails(bbfsStr) {
 }
 
 // ==========================================
-// 5. HELPER FORMAT & KIRIM TEKS TELEGRAM
+// 5. HELPER FORMAT & KIRIM TEKS/GAMBAR TELEGRAM
 // ==========================================
 function formatTelegramMessage(pasaran, tanggal, bbfs, details) {
   const namaTampil = MAP_NAMA_DISPLAY[pasaran] || pasaran;
@@ -214,16 +214,25 @@ function formatTelegramMessage(pasaran, tanggal, bbfs, details) {
          `✅ <i>Prediksi Mbah Sugeng Telah Di Terbitkan!</i>`;
 }
 
-function sendTelegramTextMessage(textMessage) {
+// Kirim Teks
+function sendTelegramTextMessage(textMessage, targetChatId = null, targetTopicId = null) {
   return new Promise((resolve) => {
-    if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return resolve(null);
+    const chatId = targetChatId || TELEGRAM_CHAT_ID;
+    const topicId = targetTopicId || TELEGRAM_TOPIC_TEXT_ID;
 
-    const postData = JSON.stringify({
-      chat_id: TELEGRAM_CHAT_ID,
-      message_thread_id: TELEGRAM_TOPIC_TEXT_ID,
+    if (!TELEGRAM_TOKEN || !chatId) return resolve(null);
+
+    const payload = {
+      chat_id: chatId,
       text: textMessage,
       parse_mode: 'HTML'
-    });
+    };
+
+    if (topicId) {
+      payload.message_thread_id = topicId;
+    }
+
+    const postData = JSON.stringify(payload);
 
     const options = {
       hostname: 'api.telegram.org',
@@ -250,9 +259,9 @@ function sendTelegramTextMessage(textMessage) {
   });
 }
 
+// Kirim Gambar + Caption + Button
 function sendTelegramBannerPhoto(photoBuffer, captionText, targetChatId = null, targetTopicId = null) {
   return new Promise((resolve) => {
-    // Jika tidak diisi, gunakan target default (Grup Utama)
     const chatId = targetChatId || TELEGRAM_CHAT_ID;
     const topicId = targetTopicId || TELEGRAM_TOPIC_GAMBAR_ID;
 
@@ -307,7 +316,7 @@ function sendTelegramBannerPhoto(photoBuffer, captionText, targetChatId = null, 
 }
 
 // ==========================================
-// 6. PUPPETEER MULTI-BANNER RENDERER (SAFE-GUARDED)
+// 6. PUPPETEER MULTI-BANNER RENDERER
 // ==========================================
 async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tanggalFormatted) {
   const fullPath = path.resolve(templateHtmlPath);
@@ -328,7 +337,6 @@ async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tangga
   await page.setViewport({ width: 1200, height: 1500, deviceScaleFactor: 3 });
   await page.goto(`file://${fullPath}`, { waitUntil: 'networkidle0' });
 
-  // Inject seluruh data sekaligus ke HTML dengan Pengecekan Aman (Null Safe)
   await page.evaluate((groups, tgl, mapDisplay) => {
     groups.forEach(({ bannerId, data }) => {
       const targetBanner = document.getElementById(bannerId);
@@ -372,7 +380,6 @@ async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tangga
     });
   }, allGroups, tanggalFormatted, MAP_NAMA_DISPLAY);
 
-  // Ambil Screenshot HD per Banner
   const imageBuffers = [];
   for (const group of allGroups) {
     const bannerElement = await page.$(`#${group.bannerId}`);
@@ -413,7 +420,7 @@ async function runBot() {
 
     const allPredictionsMap = {};
 
-    // BACA DATA YANG SUDAH ADA DI FIRESTORE TERLEBIH DAHULU
+    // BACA / INPUT DATA FIRESTORE
     for (const pasaran of DAFTAR_PASARAN) {
       const docId = `${tanggalWIB}_${pasaran.replace(/\s+/g, '')}`;
       const docSnap = await prediksiRef.doc(docId).get();
@@ -470,20 +477,25 @@ async function runBot() {
       allPredictionsMap[pasaran] = { pasaran, bbfs, details };
     }
 
-    // SIMPAN/UPDATE BATCH JIKA ADA PASARAN BARU
     await batch.commit();
     console.log(`[BOT] ✅ Firestore & History Panel terverifikasi sinkron.`);
 
-    // KIRIM TEKS KE TELEGRAM
+    // ----------------------------------------------------
+    // PROSES 1: KIRIM TEKS HANYA KE GRUP 1 (UTAMA)
+    // ----------------------------------------------------
     for (const pasaran of DAFTAR_PASARAN) {
       const pred = allPredictionsMap[pasaran];
       const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, pred.bbfs, pred.details);
-      await sendTelegramTextMessage(textMsg);
+      
+      // Kirim teks prediksi hanya ke Grup 1
+      await sendTelegramTextMessage(textMsg, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_TEXT_ID);
       await delay(100);
     }
-    console.log(`[BOT] ✅ Seluruh teks 18 pasaran terkirim ke Telegram.`);
+    console.log(`[BOT] ✅ Seluruh teks 18 pasaran terkirim ke Grup Utama.`);
 
-    // MAP KELOMPOK BANNER SECARA SINKRON DAN PRESISI URUTAN
+    // ----------------------------------------------------
+    // PROSES 2: RENDER BANNER GAMBAR
+    // ----------------------------------------------------
     const group1Data = KELOMPOK_PASARAN_1.map(p => allPredictionsMap[p]).filter(Boolean);
     const group2Data = KELOMPOK_PASARAN_2.map(p => allPredictionsMap[p]).filter(Boolean);
     const macauGroupData = KELOMPOK_MACAU.map(p => allPredictionsMap[p]).filter(Boolean);
@@ -502,18 +514,33 @@ async function runBot() {
       { bannerId: 'banner-3', data: macauGroupData }
     ];
 
-    console.log(`[BOT] Memulai render 3 banner... (Banner 1: ${group1Data.length}, Banner 2: ${group2Data.length}, Banner 3 Macau: ${macauGroupData.length})`);
+    console.log(`[BOT] Memulai render 3 banner...`);
 
     const renderedBanners = await renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tanggalFormatted);
 
+    // ----------------------------------------------------
+    // PROSES 3: KIRIM GAMBAR + CAPTION + BUTTON KE GRUP 1 DAN GRUP 2
+    // ----------------------------------------------------
     for (const item of renderedBanners) {
-      const res = await sendTelegramBannerPhoto(item.buffer, captionBase);
-      if (res) {
-        console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim.`);
+      // 1. Kirim ke Grup Utama (Grup 1)
+      const res1 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_GAMBAR_ID);
+      if (res1) {
+        console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup Utama.`);
       } else {
-        console.error(`[TELEGRAM ERROR] ❌ Gagal mengirim gambar ${item.bannerId}`);
+        console.error(`[TELEGRAM ERROR] ❌ Gagal kirim ${item.bannerId} ke Grup Utama.`);
       }
-      await delay(2500); // Jeda 2.5 detik per banner untuk mencegah Telegram Rate Limit
+
+      await delay(1000); // Jeda 1 detik sebelum kirim ke Grup 2
+
+      // 2. Kirim ke Grup Kedua (Grup 2)
+      const res2 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
+      if (res2) {
+        console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup 2.`);
+      } else {
+        console.error(`[TELEGRAM ERROR] ❌ Gagal kirim ${item.bannerId} ke Grup 2.`);
+      }
+
+      await delay(2500); // Jeda antar banner untuk cegah rate-limit Telegram
     }
 
   } catch (error) {
