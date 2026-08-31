@@ -1,38 +1,45 @@
 name: Bot Auto Runner
 
 on:
-  # 'schedule' (cron) dihapus agar tidak berjalan otomatis tiap pergantian hari
   workflow_dispatch:
-  repository_dispatch:
-    types: [run-bot-manual]
+  schedule:
+    # Cron ini berjalan pada UTC: 17, 19, 21, 23, 01, 03, 05, 07, 09, 11, 13, 15
+    # Dalam WIB (UTC+7): 00:00, 02:00, 04:00, 06:00, 08:00, 10:00, 12:00, 14:00, 16:00, 18:00, 20:00, 22:00
+    - cron: '0 17,19,21,23,1,3,5,7,9,11,13,15 * * *'
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./botprediksi
-
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: '18'
 
       - name: Install Dependencies
         run: npm install
 
-      - name: Install Puppeteer Browsers
-        run: npx puppeteer browsers install chrome
-
-      - name: Run Bot Script
+      - name: Run Bot Task
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_TOPIC_GAMBAR_ID: ${{ secrets.TELEGRAM_TOPIC_GAMBAR_ID }}
           TELEGRAM_TOPIC_TEXT_ID: ${{ secrets.TELEGRAM_TOPIC_TEXT_ID }}
-        run: node bot-auto.js
+          TELEGRAM_CHAT_ID_2: ${{ secrets.TELEGRAM_CHAT_ID_2 }}
+          TELEGRAM_TOPIC_GAMBAR_2_ID: ${{ secrets.TELEGRAM_TOPIC_GAMBAR_2_ID }}
+        run: |
+          JAM_WIB=$(TZ='Asia/Jakarta' date +'%H')
+          
+          if [ "$JAM_WIB" != "00" ]; then
+            echo "Mode: Repeat Gambar Grup 2 (Jam $JAM_WIB:00 WIB)"
+            export ONLY_GROUP_2=true
+          else
+            echo "Mode: Full Run 00:00 WIB (Firestore, Panel Admin, Grup 1 & 2)"
+            export ONLY_GROUP_2=false
+          fi
+          
+          node bot.js
