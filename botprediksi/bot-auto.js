@@ -60,7 +60,7 @@ const JADWAL_JAM = {
   "TOTOWUHAN":    { tutup: "10:00 WIB", result: "10:30 WIB" },
   "HKSIANG":      { tutup: "10:30 WIB", result: "11:00 WIB" },
   "SYDNEY4D":     { tutup: "13:35 WIB", result: "14:00 WIB" },
-  "TAIPEI":       { tutup: "14:30 WIB", result: "15:00 WIB" },
+  "TAIPEI":        { tutup: "14:30 WIB", result: "15:00 WIB" },
   "SGMETRO":      { tutup: "11:30 WIB", result: "12:00 WIB" },
   "BUSANDAY":     { tutup: "15:00 WIB", result: "15:30 WIB" },
   "SINGAPORE":    { tutup: "17:35 WIB", result: "17:45 WIB" },
@@ -253,7 +253,6 @@ function sendTelegramTextMessage(textMessage, targetChatId = null, targetTopicId
   });
 }
 
-// KIRIM GAMBAR DENGAN DUKUNGAN FILE_ID ATAU BUFFER
 function sendTelegramBannerPhoto(photoSource, captionText, targetChatId = null, targetTopicId = null) {
   return new Promise((resolve) => {
     const chatId = targetChatId || TELEGRAM_CHAT_ID;
@@ -276,7 +275,6 @@ function sendTelegramBannerPhoto(photoSource, captionText, targetChatId = null, 
       ]
     };
 
-    // OPSIONAL A: JIKA MENGGUNAKAN FILE_ID (SANGAT CEPAT - INSTAN)
     if (typeof photoSource === 'string') {
       const payload = {
         chat_id: chatId,
@@ -310,7 +308,6 @@ function sendTelegramBannerPhoto(photoSource, captionText, targetChatId = null, 
       req.end();
 
     } else {
-      // OPSIONAL B: JIKA MENGGUNAKAN BUFFER GAMBAR (UPLOAD FILE BARU)
       const form = new FormData();
       form.append('chat_id', chatId);
       if (topicId) form.append('message_thread_id', topicId);
@@ -363,7 +360,6 @@ async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tangga
   });
 
   const page = await browser.newPage();
-  // DIUBAH: deviceScaleFactor menjadi 2 agar ukuran file kecil dan render kencang
   await page.setViewport({ width: 1200, height: 1500, deviceScaleFactor: 2 });
   await page.goto(`file://${fullPath}`, { waitUntil: 'networkidle0' });
 
@@ -433,7 +429,13 @@ async function runBot() {
   const tanggalFormatted = getFormattedDateWIB();
   const currentDayWIB = getDayOfWeekWIB();
 
+  // FLAG DETEKSI REPEAT MODE GRUP 2
+  const isOnlyGroup2 = process.env.ONLY_GROUP_2 === 'true';
+
   console.log(`[BOT] Memulai otomatisasi tanggal: ${tanggalWIB} (${tanggalFormatted})`);
+  if (isOnlyGroup2) {
+    console.log("[BOT] 🔄 Mode REPEAT 2 Jam: Hanya mengirim GAMBAR ke GRUP 2.");
+  }
 
   try {
     const botConfigDoc = await db.collection('settings').doc('bot_control').get();
@@ -481,45 +483,51 @@ async function runBot() {
         details = generatePredictionDetails(bbfs);
         jamInfo = JADWAL_JAM[pasaran] || { tutup: "- WIB", result: "- WIB" };
 
-        const payload = {
-          pasaran, 
-          tanggal: tanggalWIB, 
-          bbfs,
-          jamTutup: jamInfo.tutup, 
-          jamResult: jamInfo.result,
-          colokBebas: details.cb, 
-          colok_bebas: details.cb,
-          colokMacau: details.cm, 
-          colok_macau: details.cm,
-          shio: details.shio, 
-          twin: details.twin,
-          d2: details.d2, 
-          d3: details.d3, 
-          d4: details.d4,
-          createdBy: "BOT_AUTOMATION",
-          createdAt: admin.firestore.FieldValue.serverTimestamp()
-        };
+        if (!isOnlyGroup2) {
+          const payload = {
+            pasaran, 
+            tanggal: tanggalWIB, 
+            bbfs,
+            jamTutup: jamInfo.tutup, 
+            jamResult: jamInfo.result,
+            colokBebas: details.cb, 
+            colok_bebas: details.cb,
+            colokMacau: details.cm, 
+            colok_macau: details.cm,
+            shio: details.shio, 
+            twin: details.twin,
+            d2: details.d2, 
+            d3: details.d3, 
+            d4: details.d4,
+            createdBy: "BOT_AUTOMATION",
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+          };
 
-        batch.set(prediksiRef.doc(docId), payload, { merge: true });
+          batch.set(prediksiRef.doc(docId), payload, { merge: true });
+        }
       }
 
       allPredictionsMap[pasaran] = { pasaran, bbfs, details };
     }
 
-    await batch.commit();
-    console.log(`[BOT] ✅ Firestore & History Panel terverifikasi sinkron.`);
+    if (!isOnlyGroup2) {
+      await batch.commit();
+      console.log(`[BOT] ✅ Firestore & History Panel terverifikasi sinkron.`);
+    }
 
     // ----------------------------------------------------
-    // PROSES 1: KIRIM TEKS HANYA KE GRUP 1 (UTAMA)
+    // PROSES 1: KIRIM TEKS HANYA KE GRUP 1 (LEWATI JIKA REPEAT MODE)
     // ----------------------------------------------------
-    for (const pasaran of DAFTAR_PASARAN) {
-      const pred = allPredictionsMap[pasaran];
-      const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, pred.bbfs, pred.details);
-      
-      await sendTelegramTextMessage(textMsg, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_TEXT_ID);
-      await delay(50); // Jeda diperkecil jadi 50ms
+    if (!isOnlyGroup2) {
+      for (const pasaran of DAFTAR_PASARAN) {
+        const pred = allPredictionsMap[pasaran];
+        const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, pred.bbfs, pred.details);
+        
+        await sendTelegramTextMessage(textMsg, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_TEXT_ID);
+        await delay(50);
+      }
+      console.log(`[BOT] ✅ Seluruh teks 18 pasaran terkirim ke Grup Utama.`);
     }
-    console.log(`[BOT] ✅ Seluruh teks 18 pasaran terkirim ke Grup Utama.`);
 
     // ----------------------------------------------------
     // PROSES 2: RENDER BANNER GAMBAR
@@ -546,34 +554,44 @@ async function runBot() {
     const renderedBanners = await renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tanggalFormatted);
 
     // ----------------------------------------------------
-    // PROSES 3: KIRIM GAMBAR (OPTIMASI TERCEPAT VIA FILE_ID)
+    // PROSES 3: KIRIM GAMBAR (FIXED RATE-LIMIT & MULTI-GROUP)
     // ----------------------------------------------------
     for (const item of renderedBanners) {
-      // 1. Upload Buffer Ke Grup Utama
-      const res1 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_GAMBAR_ID);
-      
       let fileId = null;
-      if (res1 && res1.ok && res1.result && res1.result.photo) {
-        // Ambil ID foto ukuran terbesar
-        const photos = res1.result.photo;
-        fileId = photos[photos.length - 1].file_id;
-        console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup Utama.`);
-      } else {
-        console.error(`[TELEGRAM ERROR] ❌ Gagal kirim ${item.bannerId} ke Grup Utama.`);
+
+      if (!isOnlyGroup2) {
+        // 1. Upload Buffer Ke Grup Utama (Grup 1)
+        const res1 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_GAMBAR_ID);
+        
+        if (res1 && res1.ok && res1.result && res1.result.photo) {
+          const photos = res1.result.photo;
+          fileId = photos[photos.length - 1].file_id;
+          console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup Utama.`);
+        } else {
+          console.error(`[TELEGRAM ERROR] ❌ Gagal kirim ${item.bannerId} ke Grup Utama.`);
+        }
+
+        // Jeda 1 detik setelah upload Grup 1
+        await delay(1000);
       }
 
-      // 2. Kirim Ke Grup 2 Menggunakan File ID (Instan)
+      // 2. Kirim Ke Grup 2 (Selalu Berjalan)
       if (fileId) {
+        // Kirim via file_id (Instan)
         const res2 = await sendTelegramBannerPhoto(fileId, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
         if (res2 && res2.ok) {
-          console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup 2 (Instan via file_id).`);
+          console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup 2 (via file_id).`);
         }
       } else {
-        // Fallback jika fileId gagal diambil
-        await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
+        // Fallback: Kirim via Buffer (Jika repeat run ATAU jika upload Grup 1 gagal)
+        const res2 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
+        if (res2 && res2.ok) {
+          console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup 2 (via buffer).`);
+        }
       }
 
-      await delay(500); // Jeda singkat antar banner
+      // Jeda aman 1.5 detik antar banner
+      await delay(1500);
     }
 
     console.log("[BOT] ✅ SELURUH PROSES BERHASIL SELESAI!");
