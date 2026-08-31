@@ -46,7 +46,7 @@ const MAP_NAMA_DISPLAY = {
   "TOTOMACAU 23": "TOTO MACAU 2300"
 };
 
-// Kelompok Pasaran untuk 3 Template Banner
+// Kelompok Pasaran untuk 3 Template Banner (Dipersingkat & Presisi 6 Pasaran per Banner)
 const KELOMPOK_PASARAN_1 = ["SINGAPORE", "MALAYSIA", "MACAU", "BUSANNIGHT", "QATAR", "HONGKONG"];
 const KELOMPOK_PASARAN_2 = ["TOTOWUHAN", "HKSIANG", "SYDNEY4D", "TAIPEI", "SGMETRO", "BUSANDAY"];
 const KELOMPOK_MACAU      = ["TOTOMACAU 13", "TOTOMACAU 16", "TOTOMACAU 19", "TOTOMACAU 22", "TOTOMACAU 23", "TOTOMACAU 00"];
@@ -298,7 +298,7 @@ function sendTelegramBannerPhoto(photoBuffer, captionText) {
 }
 
 // ==========================================
-// 6. PUPPETEER MULTI-BANNER RENDERER
+// 6. PUPPETEER MULTI-BANNER RENDERER (SUPER HD)
 // ==========================================
 async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tanggalFormatted) {
   const fullPath = path.resolve(templateHtmlPath);
@@ -308,11 +308,16 @@ async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tangga
 
   const browser = await puppeteer.launch({
     headless: "new",
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: [
+      '--no-sandbox', 
+      '--disable-setuid-sandbox',
+      '--force-device-scale-factor=3' // Skala render HD 3x
+    ]
   });
 
   const page = await browser.newPage();
-  await page.setViewport({ width: 1024, height: 1280, deviceScaleFactor: 2 });
+  // Viewport lebih besar + scale factor 3 agar hasil tajam maksimal
+  await page.setViewport({ width: 1200, height: 1500, deviceScaleFactor: 3 });
   await page.goto(`file://${fullPath}`, { waitUntil: 'networkidle0' });
 
   // Inject seluruh data sekaligus ke HTML
@@ -359,12 +364,12 @@ async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tangga
     });
   }, allGroups, tanggalFormatted, MAP_NAMA_DISPLAY);
 
-  // Ambil Screenshot untuk masing-masing banner
+  // Ambil Screenshot HD
   const imageBuffers = [];
   for (const group of allGroups) {
     const bannerElement = await page.$(`#${group.bannerId}`);
     if (bannerElement) {
-      const buffer = await bannerElement.screenshot({ type: 'png' });
+      const buffer = await bannerElement.screenshot({ type: 'png', omitBackground: false });
       imageBuffers.push({ bannerId: group.bannerId, buffer });
     }
   }
@@ -466,7 +471,9 @@ async function runBot() {
       allPredictionsMap[pasaran] = itemData;
 
       const normP = normalize(pasaran);
-      if (normMacau.includes(normP)) {
+      
+      // LOGIKA PEMBAGIAN PASARAN PRESI
+      if (normP.startsWith("TOTOMACAU")) {
         macauGroupData.push(itemData);
       } else if (normG1.includes(normP)) {
         group1Data.push(itemData);
@@ -496,19 +503,21 @@ async function runBot() {
 
     const templateHtmlPath = path.join(__dirname, 'template.html');
 
-    // 3. PROSES BANNER GAMBAR VIA PUPPETEER (Sekali Launch)
+    // 3. PROSES BANNER GAMBAR VIA PUPPETEER
     const allGroups = [
       { bannerId: 'banner-1', data: group1Data },
       { bannerId: 'banner-2', data: group2Data },
       { bannerId: 'banner-3', data: macauGroupData }
     ];
 
+    console.log(`[BOT] Memulai render 3 banner... (Group 1: ${group1Data.length}, Group 2: ${group2Data.length}, Macau: ${macauGroupData.length})`);
+
     const renderedBanners = await renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tanggalFormatted);
 
     for (const item of renderedBanners) {
       await sendTelegramBannerPhoto(item.buffer, captionBase);
       console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim.`);
-      await delay(500);
+      await delay(2000); // Jeda 2 detik antar gambar agar tidak ditolak Telegram Rate Limit
     }
 
   } catch (error) {
