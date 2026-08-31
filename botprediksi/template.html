@@ -46,7 +46,7 @@
       box-shadow: 0 0 40px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(42, 145, 204, 0.2);
     }
 
-    /* Layout Header (Kiri - Tengah - Kanan) */
+    /* Layout Header */
     .header {
       margin-bottom: 20px;
     }
@@ -158,19 +158,20 @@
       text-shadow: 0 0 4px rgba(42, 145, 204, 0.4);
     }
 
+    /* WARNA ANGKA PREDIKSI DIUBAH KE PUTIH DI SINI */
     .slot-area {
       height: 36px;
       background: rgba(0, 0, 0, 0.75);
-      border: 1px solid rgba(212, 175, 55, 0.6);
+      border: 1px solid rgba(42, 145, 204, 0.6);
       border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 18px;
       font-weight: bold;
-      color: #ffd700;
+      color: #ffffff; /* Angka jadi warna putih */
       letter-spacing: 2px;
-      text-shadow: 0 0 6px rgba(255, 215, 0, 0.6);
+      text-shadow: 0 0 8px rgba(255, 255, 255, 0.7), 0 0 12px rgba(0, 225, 255, 0.4); /* Glow putih terang */
       text-align: center;
       box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8);
     }
@@ -231,7 +232,7 @@
 </head>
 <body>
 
-  <!-- BANNER 1 (ID: banner-1) -->
+  <!-- BANNER 1 -->
   <div class="banner-container" id="banner-1">
     <div class="header">
       <div class="header-top">
@@ -248,7 +249,7 @@
     </div>
   </div>
 
-  <!-- BANNER 2 (ID: banner-2) -->
+  <!-- BANNER 2 -->
   <div class="banner-container" id="banner-2">
     <div class="header">
       <div class="header-top">
@@ -260,12 +261,12 @@
     </div>
     <div class="grid-container">
       <script>
-        renderPasaran(["TOTOWUHAN", "HONGKONG SIANG", "SYDNEY4D", "TAIPEI", "SGMETRO", "BUSANDAY"]);
+        renderPasaran(["TOTOWUHAN", "HKSIANG", "SYDNEY4D", "TAIPEI", "SGMETRO", "BUSANDAY"]);
       </script>
     </div>
   </div>
 
-  <!-- BANNER 3 (ID: banner-3) -->
+  <!-- BANNER 3 (TOTOMACAU 00 DUAWAR, 23 TERAKHIR) -->
   <div class="banner-container" id="banner-3">
     <div class="header">
       <div class="header-top">
@@ -277,8 +278,7 @@
     </div>
     <div class="grid-container">
       <script>
-        /* URUTAN DIBUAT TOTO MACAU 0000 PERTAMA KALI DAN 2300 TERAKHIR */
-        renderPasaran(["TOTO MACAU 0000", "TOTO MACAU 1300", "TOTO MACAU 1600", "TOTO MACAU 1900", "TOTO MACAU 2200", "TOTO MACAU 2300"]);
+        renderPasaran(["TOTOMACAU 00", "TOTOMACAU 13", "TOTOMACAU 16", "TOTOMACAU 19", "TOTOMACAU 22", "TOTOMACAU 23"]);
       </script>
     </div>
   </div>
