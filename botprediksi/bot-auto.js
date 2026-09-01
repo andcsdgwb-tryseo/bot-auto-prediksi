@@ -249,7 +249,8 @@ function sendTelegramTextMessage(textMessage) {
   });
 }
 
-function sendTelegramBannerPhoto(photoBuffer, captionText, targetChatId = null, targetTopicId = null) {
+// KIRIM BERDASARKAN FILE_ID ATAU BUFFER
+function sendTelegramBannerPhoto(photoSource, captionText, targetChatId = null, targetTopicId = null) {
   return new Promise((resolve) => {
     const chatId = targetChatId || TELEGRAM_CHAT_ID;
     const topicId = targetTopicId || TELEGRAM_TOPIC_GAMBAR_ID;
@@ -259,7 +260,6 @@ function sendTelegramBannerPhoto(photoBuffer, captionText, targetChatId = null, 
       return resolve(null);
     }
 
-    const form = new FormData();
     const replyMarkup = {
       inline_keyboard: [
         [{ text: "🛡️ LINK UTAMA TARGET4D", url: "https://t4dtop.com/1" }],
@@ -272,35 +272,69 @@ function sendTelegramBannerPhoto(photoBuffer, captionText, targetChatId = null, 
       ]
     };
 
-    form.append('chat_id', chatId);
-    if (topicId) {
-      form.append('message_thread_id', topicId);
+    // JIKA MEMAKAI FILE_ID (TEKS STRING) - SUPER FAST
+    if (typeof photoSource === 'string') {
+      const postData = JSON.stringify({
+        chat_id: chatId,
+        message_thread_id: topicId,
+        photo: photoSource,
+        caption: captionText,
+        parse_mode: 'HTML',
+        reply_markup: replyMarkup
+      });
+
+      const options = {
+        hostname: 'api.telegram.org',
+        path: `/bot${TELEGRAM_TOKEN}/sendPhoto`,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      };
+
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => body += chunk);
+        res.on('end', () => resolve(JSON.parse(body)));
+      });
+
+      req.on('error', (err) => {
+        console.error("[TELEGRAM ERROR - SEND VIA FILE_ID]:", err.message);
+        resolve(null);
+      });
+      req.write(postData);
+      req.end();
+    } else {
+      // JIKA MEMAKAI BUFFER (FILE MENTAH PUPPETEER)
+      const form = new FormData();
+      form.append('chat_id', chatId);
+      if (topicId) form.append('message_thread_id', topicId);
+      form.append('photo', photoSource, { filename: 'prediksi-banner.png' });
+      form.append('caption', captionText);
+      form.append('parse_mode', 'HTML');
+      form.append('reply_markup', JSON.stringify(replyMarkup));
+
+      const options = {
+        hostname: 'api.telegram.org',
+        path: `/bot${TELEGRAM_TOKEN}/sendPhoto`,
+        method: 'POST',
+        headers: form.getHeaders()
+      };
+
+      const req = https.request(options, (res) => {
+        let body = '';
+        res.on('data', (chunk) => body += chunk);
+        res.on('end', () => resolve(JSON.parse(body)));
+      });
+
+      req.on('error', (err) => {
+        console.error("[TELEGRAM ERROR - SEND BUFFER]:", err.message);
+        resolve(null);
+      });
+
+      form.pipe(req);
     }
-
-    form.append('photo', photoBuffer, { filename: 'prediksi-banner.png' });
-    form.append('caption', captionText);
-    form.append('parse_mode', 'HTML');
-    form.append('reply_markup', JSON.stringify(replyMarkup));
-
-    const options = {
-      hostname: 'api.telegram.org',
-      path: `/bot${TELEGRAM_TOKEN}/sendPhoto`,
-      method: 'POST',
-      headers: form.getHeaders()
-    };
-
-    const req = https.request(options, (res) => {
-      let body = '';
-      res.on('data', (chunk) => body += chunk);
-      res.on('end', () => resolve(body));
-    });
-
-    req.on('error', (err) => {
-      console.error("[TELEGRAM ERROR - PHOTO]:", err.message);
-      resolve(null);
-    });
-
-    form.pipe(req);
   });
 }
 
@@ -398,16 +432,14 @@ async function runBot() {
 
   try {
     const botConfigDoc = await db.collection('settings').doc('bot_control').get();
-    
     if (botConfigDoc.exists && botConfigDoc.data().active === false) {
       console.log("[BOT] Status bot OFF di Panel Admin. Eksekusi dibatalkan.");
       return;
     }
-    
-    console.log("[BOT] Status bot ON. Melanjutkan eksekusi...");
 
     const batch = db.batch();
     const prediksiRef = db.collection('prediksi');
+    const bannerCacheRef = db.collection('banner_cache').doc(tanggalWIB);
     const allPredictionsMap = {};
 
     // 1. SINKRONISASI DATA FIRESTORE
@@ -443,20 +475,12 @@ async function runBot() {
         jamInfo = JADWAL_JAM[pasaran] || { tutup: "- WIB", result: "- WIB" };
 
         const payload = {
-          pasaran, 
-          tanggal: tanggalWIB, 
-          bbfs,
-          jamTutup: jamInfo.tutup, 
-          jamResult: jamInfo.result,
-          colokBebas: details.cb, 
-          colok_bebas: details.cb,
-          colokMacau: details.cm, 
-          colok_macau: details.cm,
-          shio: details.shio, 
-          twin: details.twin,
-          d2: details.d2, 
-          d3: details.d3, 
-          d4: details.d4,
+          pasaran, tanggal: tanggalWIB, bbfs,
+          jamTutup: jamInfo.tutup, jamResult: jamInfo.result,
+          colokBebas: details.cb, colok_bebas: details.cb,
+          colokMacau: details.cm, colok_macau: details.cm,
+          shio: details.shio, twin: details.twin,
+          d2: details.d2, d3: details.d3, d4: details.d4,
           createdBy: "BOT_AUTOMATION",
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         };
@@ -468,9 +492,28 @@ async function runBot() {
     }
 
     await batch.commit();
-    console.log(`[BOT] ✅ Firestore & History Panel terverifikasi sinkron.`);
 
-    // 2. KIRIM TEKS KE GRUP 1 (HANYA JIKA MODE FULL RUN)
+    const captionBase = `🎯 <b>PREDIKSI TOGEL ${tanggalFormatted}</b> 🎯\n\n` +
+                        `🔥 <b>Angka pilihan hari ini sudah siap!</b>\n` +
+                        `💰 BIDIK ANGKA • INCAR JP • KEJAR MENANG 💰\n\n` +
+                        `⚡ Prediksi tajam, pilihan terbaik, dan jadwal lengkap berbagai pasaran.\n\n` +
+                        `✨ Cek angka pilihanmu dan tetap bermain secara bijak.`;
+
+    // 2. CEK CACHE FILE_ID UNTUK REPEAT SUPER CEPAT
+    const cacheSnap = await bannerCacheRef.get();
+    let cachedFileIds = cacheSnap.exists ? cacheSnap.data().fileIds : null;
+
+    if (IS_ONLY_GROUP_2 && cachedFileIds) {
+      console.log("[BOT] 🚀 Menggunakan Cache File_ID untuk pengiriman super cepat ke Grup 2...");
+      for (const item of cachedFileIds) {
+        await sendTelegramBannerPhoto(item.fileId, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
+        await delay(1000);
+      }
+      console.log("[BOT] ✅ Pengiriman repeat via File_ID selesai!");
+      return;
+    }
+
+    // 3. JIKA BELUM ADA FILE_ID / FULL RUN: RENDER VIA PUPPETEER
     if (!IS_ONLY_GROUP_2) {
       for (const pasaran of DAFTAR_PASARAN) {
         const pred = allPredictionsMap[pasaran];
@@ -480,47 +523,50 @@ async function runBot() {
           await delay(100);
         }
       }
-      console.log(`[BOT] ✅ Seluruh teks 18 pasaran terkirim ke Grup Utama.`);
     }
 
-    // 3. RENDER BANNER GAMBAR VIA PUPPETEER
     const group1Data = KELOMPOK_PASARAN_1.map(p => allPredictionsMap[p]).filter(Boolean);
     const group2Data = KELOMPOK_PASARAN_2.map(p => allPredictionsMap[p]).filter(Boolean);
     const macauGroupData = KELOMPOK_MACAU.map(p => allPredictionsMap[p]).filter(Boolean);
 
-    const captionBase = `🎯 <b>PREDIKSI TOGEL ${tanggalFormatted}</b> 🎯\n\n` +
-                        `🔥 <b>Angka pilihan hari ini sudah siap!</b>\n` +
-                        `💰 BIDIK ANGKA • INCAR JP • KEJAR MENANG 💰\n\n` +
-                        `⚡ Prediksi tajam, pilihan terbaik, dan jadwal lengkap berbagai pasaran.\n\n` +
-                        `✨ Cek angka pilihanmu dan tetap bermain secara bijak.`;
-
     const templateHtmlPath = path.join(__dirname, 'template.html');
-
     const allGroups = [
       { bannerId: 'banner-1', data: group1Data },
       { bannerId: 'banner-2', data: group2Data },
       { bannerId: 'banner-3', data: macauGroupData }
     ];
 
-    console.log(`[BOT] Memulai render 3 banner...`);
+    console.log(`[BOT] Merender banner via Puppeteer...`);
     const renderedBanners = await renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tanggalFormatted);
 
-    // 4. DISTRIBUSI PENGIRIMAN GAMBAR
+    const newFileIds = [];
+
     for (const item of renderedBanners) {
-      if (!IS_ONLY_GROUP_2) {
-        // Mode Full Run: Kirim ke Grup Utama
-        await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_GAMBAR_ID);
-        await delay(1500);
+      // Kirim Gambar ke Grup Utama (Grup 1)
+      const resGrup1 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_GAMBAR_ID);
+      await delay(1500);
+
+      // Simpan File_ID yang didapatkan dari Telegram
+      let fileId = null;
+      if (resGrup1 && resGrup1.ok && resGrup1.result && resGrup1.result.photo) {
+        const photos = resGrup1.result.photo;
+        fileId = photos[photos.length - 1].file_id;
+        newFileIds.push({ bannerId: item.bannerId, fileId });
       }
 
-      // Selalu Kirim ke Grup Kedua (Grup Repeat)
-      const res2 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
-      if (res2) {
-        console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup 2.`);
-      } else {
-        console.error(`[TELEGRAM ERROR] ❌ Gagal mengirim gambar ${item.bannerId} ke Grup 2.`);
-      }
-      await delay(2500);
+      // Kirim Gambar ke Grup Kedua (Grup 2) menggunakan file_id jika ada, atau buffer jika tidak ada
+      await sendTelegramBannerPhoto(fileId || item.buffer, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
+      await delay(1500);
+    }
+
+    // Simpan File_ID ke Firestore untuk eksekusi repeat selanjutnya
+    if (newFileIds.length > 0) {
+      await bannerCacheRef.set({
+        tanggal: tanggalWIB,
+        fileIds: newFileIds,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      console.log("[BOT] ✅ File_ID berhasil disimpan ke Firestore untuk repeat berikutnya.");
     }
 
   } catch (error) {
