@@ -8,11 +8,6 @@ const path = require('path');
 // ==========================================
 // 1. INISIALISASI FIREBASE ADMIN SDK
 // ==========================================
-if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-  console.error("❌ FIREBASE_SERVICE_ACCOUNT Secret belum diisi!");
-  process.exit(1);
-}
-
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 if (!admin.apps.length) {
@@ -31,8 +26,12 @@ const TELEGRAM_CHAT_ID         = process.env.TELEGRAM_CHAT_ID || "-1004474947415
 const TELEGRAM_TOPIC_GAMBAR_ID = process.env.TELEGRAM_TOPIC_GAMBAR_ID || 27;
 const TELEGRAM_TOPIC_TEXT_ID   = process.env.TELEGRAM_TOPIC_TEXT_ID || 29;
 
+// Konfigurasi Grup Kedua (Repeat Per 2 Jam)
 const TELEGRAM_CHAT_ID_2         = process.env.TELEGRAM_CHAT_ID_2 || "-1002005725423"; 
-const TELEGRAM_TOPIC_GAMBAR_2_ID = process.env.TELEGRAM_TOPIC_GAMBAR_2_ID || 58762;
+const TELEGRAM_TOPIC_GAMBAR_2_ID = process.env.TELEGRAM_TOPIC_GAMBAR_2_ID || 58762;    
+
+// Mode Pengiriman (Diatur via runner GITHUB_ENV)
+const IS_ONLY_GROUP_2 = process.env.ONLY_GROUP_2 === 'true';
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -79,8 +78,8 @@ const JADWAL_JAM = {
 };
 
 const JADWAL_OFF = {
-  "SINGAPORE": [2, 5],
-  "TAIPEI": [1]
+  "SINGAPORE": [2, 5], 
+  "TAIPEI": [1]        
 };
 
 const DAFTAR_SHIO = [
@@ -160,6 +159,7 @@ function generatePredictionDetails(bbfsStr) {
     let d2 = getRandomChar(bbfsStr);
     if (d1 !== d2) set2D.add(`${d1}${d2}`);
   }
+  const d2Arr = Array.from(set2D);
 
   const set3D = new Set();
   let attempts3D = 0;
@@ -168,6 +168,7 @@ function generatePredictionDetails(bbfsStr) {
     let combo = getRandomChar(bbfsStr) + getRandomChar(bbfsStr) + getRandomChar(bbfsStr);
     set3D.add(combo);
   }
+  const d3Arr = Array.from(set3D);
 
   const set4D = new Set();
   let attempts4D = 0;
@@ -176,20 +177,19 @@ function generatePredictionDetails(bbfsStr) {
     let combo = getRandomChar(bbfsStr) + getRandomChar(bbfsStr) + getRandomChar(bbfsStr) + getRandomChar(bbfsStr);
     set4D.add(combo);
   }
+  const d4Arr = Array.from(set4D);
 
   return { 
     cb, cm, shio, twin, 
-    d2Arr: Array.from(set2D), 
-    d3Arr: Array.from(set3D), 
-    d4Arr: Array.from(set4D),
-    d2: Array.from(set2D).join('*'),
-    d3: Array.from(set3D).join('*'),
-    d4: Array.from(set4D).join('*')
+    d2Arr, d3Arr, d4Arr,
+    d2: d2Arr.join('*'),
+    d3: d3Arr.join('*'),
+    d4: d4Arr.join('*')
   };
 }
 
 // ==========================================
-// 5. HELPER FORMAT & KIRIM TEKS/GAMBAR TELEGRAM
+// 5. HELPER FORMAT & KIRIM TELEGRAM
 // ==========================================
 function formatTelegramMessage(pasaran, tanggal, bbfs, details) {
   const namaTampil = MAP_NAMA_DISPLAY[pasaran] || pasaran;
@@ -213,22 +213,17 @@ function formatTelegramMessage(pasaran, tanggal, bbfs, details) {
          `✅ <i>Prediksi Mbah Sugeng Telah Di Terbitkan!</i>`;
 }
 
-function sendTelegramTextMessage(textMessage, targetChatId = null, targetTopicId = null) {
+function sendTelegramTextMessage(textMessage) {
   return new Promise((resolve) => {
-    const chatId = targetChatId || TELEGRAM_CHAT_ID;
-    const topicId = targetTopicId || TELEGRAM_TOPIC_TEXT_ID;
+    if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return resolve(null);
 
-    if (!TELEGRAM_TOKEN || !chatId) return resolve(null);
-
-    const payload = {
-      chat_id: chatId,
+    const postData = JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      message_thread_id: TELEGRAM_TOPIC_TEXT_ID,
       text: textMessage,
       parse_mode: 'HTML'
-    };
+    });
 
-    if (topicId) payload.message_thread_id = topicId;
-
-    const postData = JSON.stringify(payload);
     const options = {
       hostname: 'api.telegram.org',
       path: `/bot${TELEGRAM_TOKEN}/sendMessage`,
@@ -254,7 +249,7 @@ function sendTelegramTextMessage(textMessage, targetChatId = null, targetTopicId
   });
 }
 
-function sendTelegramBannerPhoto(photoSource, captionText, targetChatId = null, targetTopicId = null) {
+function sendTelegramBannerPhoto(photoBuffer, captionText, targetChatId = null, targetTopicId = null) {
   return new Promise((resolve) => {
     const chatId = targetChatId || TELEGRAM_CHAT_ID;
     const topicId = targetTopicId || TELEGRAM_TOPIC_GAMBAR_ID;
@@ -264,6 +259,7 @@ function sendTelegramBannerPhoto(photoSource, captionText, targetChatId = null, 
       return resolve(null);
     }
 
+    const form = new FormData();
     const replyMarkup = {
       inline_keyboard: [
         [{ text: "🛡️ LINK UTAMA TARGET4D", url: "https://t4dtop.com/1" }],
@@ -276,70 +272,35 @@ function sendTelegramBannerPhoto(photoSource, captionText, targetChatId = null, 
       ]
     };
 
-    if (typeof photoSource === 'string') {
-      const payload = {
-        chat_id: chatId,
-        photo: photoSource,
-        caption: captionText,
-        parse_mode: 'HTML',
-        reply_markup: replyMarkup
-      };
-      if (topicId) payload.message_thread_id = topicId;
-
-      const postData = JSON.stringify(payload);
-      const options = {
-        hostname: 'api.telegram.org',
-        path: `/bot${TELEGRAM_TOKEN}/sendPhoto`,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(postData)
-        }
-      };
-
-      const req = https.request(options, (res) => {
-        let body = '';
-        res.on('data', chunk => body += chunk);
-        res.on('end', () => {
-          try { resolve(JSON.parse(body)); } catch (e) { resolve(null); }
-        });
-      });
-      req.on('error', () => resolve(null));
-      req.write(postData);
-      req.end();
-
-    } else {
-      const form = new FormData();
-      form.append('chat_id', chatId);
-      if (topicId) form.append('message_thread_id', topicId);
-
-      form.append('photo', photoSource, { filename: 'prediksi-banner.png' });
-      form.append('caption', captionText);
-      form.append('parse_mode', 'HTML');
-      form.append('reply_markup', JSON.stringify(replyMarkup));
-
-      const options = {
-        hostname: 'api.telegram.org',
-        path: `/bot${TELEGRAM_TOKEN}/sendPhoto`,
-        method: 'POST',
-        headers: form.getHeaders()
-      };
-
-      const req = https.request(options, (res) => {
-        let body = '';
-        res.on('data', chunk => body += chunk);
-        res.on('end', () => {
-          try { resolve(JSON.parse(body)); } catch (e) { resolve(null); }
-        });
-      });
-
-      req.on('error', (err) => {
-        console.error("[TELEGRAM ERROR - PHOTO]:", err.message);
-        resolve(null);
-      });
-
-      form.pipe(req);
+    form.append('chat_id', chatId);
+    if (topicId) {
+      form.append('message_thread_id', topicId);
     }
+
+    form.append('photo', photoBuffer, { filename: 'prediksi-banner.png' });
+    form.append('caption', captionText);
+    form.append('parse_mode', 'HTML');
+    form.append('reply_markup', JSON.stringify(replyMarkup));
+
+    const options = {
+      hostname: 'api.telegram.org',
+      path: `/bot${TELEGRAM_TOKEN}/sendPhoto`,
+      method: 'POST',
+      headers: form.getHeaders()
+    };
+
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => resolve(body));
+    });
+
+    req.on('error', (err) => {
+      console.error("[TELEGRAM ERROR - PHOTO]:", err.message);
+      resolve(null);
+    });
+
+    form.pipe(req);
   });
 }
 
@@ -356,12 +317,14 @@ async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tangga
     headless: "new",
     args: [
       '--no-sandbox', 
-      '--disable-setuid-sandbox'
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--force-device-scale-factor=3'
     ]
   });
 
   const page = await browser.newPage();
-  await page.setViewport({ width: 1200, height: 1500, deviceScaleFactor: 2 });
+  await page.setViewport({ width: 1200, height: 1500, deviceScaleFactor: 3 });
   await page.goto(`file://${fullPath}`, { waitUntil: 'networkidle0' });
 
   await page.evaluate((groups, tgl, mapDisplay) => {
@@ -375,7 +338,7 @@ async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tangga
       const cards = targetBanner.querySelectorAll('.card-pasaran');
       data.slice(0, 6).forEach((item, index) => {
         const card = cards[index];
-        if (!card || !item) return;
+        if (!card) return;
 
         const namaDisplay = mapDisplay[item.pasaran] || item.pasaran;
         const titleElem = card.querySelector('.pasaran-title');
@@ -430,18 +393,14 @@ async function runBot() {
   const tanggalFormatted = getFormattedDateWIB();
   const currentDayWIB = getDayOfWeekWIB();
 
-  const isOnlyGroup2 = process.env.ONLY_GROUP_2 === 'true';
-
   console.log(`[BOT] Memulai otomatisasi tanggal: ${tanggalWIB} (${tanggalFormatted})`);
-  if (isOnlyGroup2) {
-    console.log("[BOT] 🔄 Mode REPEAT 2 Jam: Hanya mengirim GAMBAR ke GRUP 2.");
-  }
+  console.log(`[BOT] Mode Eksekusi: ${IS_ONLY_GROUP_2 ? 'REPEAT (Hanya Grup 2)' : 'FULL RUN (Grup 1 + Grup 2)'}`);
 
   try {
     const botConfigDoc = await db.collection('settings').doc('bot_control').get();
     
     if (botConfigDoc.exists && botConfigDoc.data().active === false) {
-      console.log("[BOT] Status bot OFF. Eksekusi dibatalkan.");
+      console.log("[BOT] Status bot OFF di Panel Admin. Eksekusi dibatalkan.");
       return;
     }
     
@@ -451,9 +410,7 @@ async function runBot() {
     const prediksiRef = db.collection('prediksi');
     const allPredictionsMap = {};
 
-    let hasNewWrites = false;
-
-    // BACA / INPUT DATA FIRESTORE
+    // 1. SINKRONISASI DATA FIRESTORE
     for (const pasaran of DAFTAR_PASARAN) {
       const docId = `${tanggalWIB}_${pasaran.replace(/\s+/g, '')}`;
       const docSnap = await prediksiRef.doc(docId).get();
@@ -505,35 +462,28 @@ async function runBot() {
         };
 
         batch.set(prediksiRef.doc(docId), payload, { merge: true });
-        hasNewWrites = true;
       }
 
       allPredictionsMap[pasaran] = { pasaran, bbfs, details };
     }
 
-    if (hasNewWrites) {
-      await batch.commit();
-      console.log(`[BOT] ✅ Firestore & History Panel terverifikasi sinkron.`);
-    }
+    await batch.commit();
+    console.log(`[BOT] ✅ Firestore & History Panel terverifikasi sinkron.`);
 
-    // ----------------------------------------------------
-    // PROSES 1: KIRIM TEKS HANYA KE GRUP 1 (LEWATI JIKA REPEAT MODE)
-    // ----------------------------------------------------
-    if (!isOnlyGroup2) {
+    // 2. KIRIM TEKS KE GRUP 1 (HANYA JIKA MODE FULL RUN)
+    if (!IS_ONLY_GROUP_2) {
       for (const pasaran of DAFTAR_PASARAN) {
         const pred = allPredictionsMap[pasaran];
         if (pred) {
           const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, pred.bbfs, pred.details);
-          await sendTelegramTextMessage(textMsg, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_TEXT_ID);
-          await delay(50);
+          await sendTelegramTextMessage(textMsg);
+          await delay(100);
         }
       }
       console.log(`[BOT] ✅ Seluruh teks 18 pasaran terkirim ke Grup Utama.`);
     }
 
-    // ----------------------------------------------------
-    // PROSES 2: RENDER BANNER GAMBAR
-    // ----------------------------------------------------
+    // 3. RENDER BANNER GAMBAR VIA PUPPETEER
     const group1Data = KELOMPOK_PASARAN_1.map(p => allPredictionsMap[p]).filter(Boolean);
     const group2Data = KELOMPOK_PASARAN_2.map(p => allPredictionsMap[p]).filter(Boolean);
     const macauGroupData = KELOMPOK_MACAU.map(p => allPredictionsMap[p]).filter(Boolean);
@@ -555,44 +505,23 @@ async function runBot() {
     console.log(`[BOT] Memulai render 3 banner...`);
     const renderedBanners = await renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tanggalFormatted);
 
-    // ----------------------------------------------------
-    // PROSES 3: KIRIM GAMBAR (MULTI-GROUP)
-    // ----------------------------------------------------
+    // 4. DISTRIBUSI PENGIRIMAN GAMBAR
     for (const item of renderedBanners) {
-      let fileId = null;
-
-      if (!isOnlyGroup2) {
-        // 1. Upload Buffer Ke Grup Utama (Grup 1)
-        const res1 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_GAMBAR_ID);
-        
-        if (res1 && res1.ok && res1.result && res1.result.photo) {
-          const photos = res1.result.photo;
-          fileId = photos[photos.length - 1].file_id;
-          console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup Utama.`);
-        } else {
-          console.error(`[TELEGRAM ERROR] ❌ Gagal kirim ${item.bannerId} ke Grup Utama.`);
-        }
-
-        await delay(1000);
+      if (!IS_ONLY_GROUP_2) {
+        // Mode Full Run: Kirim ke Grup Utama
+        await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_GAMBAR_ID);
+        await delay(1500);
       }
 
-      // 2. Kirim Ke Grup 2
-      if (fileId) {
-        const res2 = await sendTelegramBannerPhoto(fileId, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
-        if (res2 && res2.ok) {
-          console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup 2 (via file_id).`);
-        }
+      // Selalu Kirim ke Grup Kedua (Grup Repeat)
+      const res2 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
+      if (res2) {
+        console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup 2.`);
       } else {
-        const res2 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
-        if (res2 && res2.ok) {
-          console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup 2 (via buffer).`);
-        }
+        console.error(`[TELEGRAM ERROR] ❌ Gagal mengirim gambar ${item.bannerId} ke Grup 2.`);
       }
-
-      await delay(1500);
+      await delay(2500);
     }
-
-    console.log("[BOT] ✅ SELURUH PROSES BERHASIL SELESAI!");
 
   } catch (error) {
     console.error("[BOT] ❌ Error Utama:", error);
