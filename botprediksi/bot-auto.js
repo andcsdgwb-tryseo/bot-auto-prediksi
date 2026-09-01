@@ -359,7 +359,7 @@ async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tangga
 
   const page = await browser.newPage();
   await page.setViewport({ width: 1200, height: 1500, deviceScaleFactor: 3 });
-  await page.goto(`file://${fullPath}`, { waitUntil: 'networkidle0' });
+  await page.goto(`file://${fullPath}`, { waitUntil: 'domcontentloaded' });
 
   await page.evaluate((groups, tgl, mapDisplay) => {
     groups.forEach(({ bannerId, data }) => {
