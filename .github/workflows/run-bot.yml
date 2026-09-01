@@ -23,11 +23,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: Install Dependencies
+        env:
+          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
         run: npm install
 
-      # PASANG BROWSER CHROME UNTUK PUPPETEER (Wajib agar Full Run jam 00:00 WIB tidak Crash)
+      # PASANG BROWSER CHROME UNTUK PUPPETEER
       - name: Install Chrome for Puppeteer
         run: npx puppeteer browsers install chrome
 
