@@ -27,6 +27,10 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
+      # PASANG BROWSER CHROME UNTUK PUPPETEER (Wajib agar Full Run jam 00:00 WIB tidak Crash)
+      - name: Install Chrome for Puppeteer
+        run: npx puppeteer browsers install chrome
+
       - name: Deteksi Mode Jam WIB & Jalankan Bot
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
@@ -36,12 +40,10 @@ jobs:
           TELEGRAM_TOPIC_TEXT_ID: ${{ secrets.TELEGRAM_TOPIC_TEXT_ID }}
           TELEGRAM_CHAT_ID_2: ${{ secrets.TELEGRAM_CHAT_ID_2 }}
           TELEGRAM_TOPIC_GAMBAR_2_ID: ${{ secrets.TELEGRAM_TOPIC_GAMBAR_2_ID }}
-          PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
         run: |
           JAM_WIB=$(TZ='Asia/Jakarta' date +'%H')
           echo "Jam Eksekusi Server (WIB): $JAM_WIB:00"
           
-          # Jika Jam 00:00 atau 01:00 WIB, jalankan Mode Full Run (Grup 1 + Grup 2)
           if [ "$JAM_WIB" = "00" ] || [ "$JAM_WIB" = "01" ]; then
             echo "Mode: FULL RUN (Grup 1 + Grup 2)"
             export ONLY_GROUP_2=false
