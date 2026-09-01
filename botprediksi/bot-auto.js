@@ -8,6 +8,11 @@ const path = require('path');
 // ==========================================
 // 1. INISIALISASI FIREBASE ADMIN SDK
 // ==========================================
+if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+  console.error("❌ FIREBASE_SERVICE_ACCOUNT Secret belum diisi!");
+  process.exit(1);
+}
+
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 if (!admin.apps.length) {
@@ -21,19 +26,16 @@ const db = admin.firestore();
 // ==========================================
 // 2. KONFIGURASI TELEGRAM BOT & TOPIC ID
 // ==========================================
-// --- GRUP UTAMA (GRUP 1) ---
 const TELEGRAM_TOKEN           = process.env.TELEGRAM_TOKEN;
 const TELEGRAM_CHAT_ID         = process.env.TELEGRAM_CHAT_ID || "-1004474947415";
-const TELEGRAM_TOPIC_GAMBAR_ID = process.env.TELEGRAM_TOPIC_GAMBAR_ID || 27; // Topic: PREDIKSI GAMBAR TOGEL
-const TELEGRAM_TOPIC_TEXT_ID   = process.env.TELEGRAM_TOPIC_TEXT_ID || 29;   // Topic: ANGKA PREDIKSI
+const TELEGRAM_TOPIC_GAMBAR_ID = process.env.TELEGRAM_TOPIC_GAMBAR_ID || 27;
+const TELEGRAM_TOPIC_TEXT_ID   = process.env.TELEGRAM_TOPIC_TEXT_ID || 29;
 
-// --- GRUP KEDUA (GRUP 2) ---
 const TELEGRAM_CHAT_ID_2         = process.env.TELEGRAM_CHAT_ID_2 || "-1002005725423"; 
 const TELEGRAM_TOPIC_GAMBAR_2_ID = process.env.TELEGRAM_TOPIC_GAMBAR_2_ID || 58762;
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Urutan Presisi 18 Pasaran
 const DAFTAR_PASARAN = [
   "TOTOWUHAN", "HKSIANG", "SYDNEY4D", "TAIPEI", "SGMETRO", "BUSANDAY",
   "SINGAPORE", "MALAYSIA", "MACAU", "BUSANNIGHT", "QATAR", "HONGKONG",
@@ -51,7 +53,6 @@ const MAP_NAMA_DISPLAY = {
   "TOTOMACAU 23": "TOTO MACAU 2300"
 };
 
-// Kelompok Pasaran untuk 3 Template Banner
 const KELOMPOK_PASARAN_1 = ["SINGAPORE", "MALAYSIA", "MACAU", "BUSANNIGHT", "QATAR", "HONGKONG"];
 const KELOMPOK_PASARAN_2 = ["TOTOWUHAN", "HKSIANG", "SYDNEY4D", "TAIPEI", "SGMETRO", "BUSANDAY"];
 const KELOMPOK_MACAU      = ["TOTOMACAU 00", "TOTOMACAU 13", "TOTOMACAU 16", "TOTOMACAU 19", "TOTOMACAU 22", "TOTOMACAU 23"];
@@ -60,7 +61,7 @@ const JADWAL_JAM = {
   "TOTOWUHAN":    { tutup: "10:00 WIB", result: "10:30 WIB" },
   "HKSIANG":      { tutup: "10:30 WIB", result: "11:00 WIB" },
   "SYDNEY4D":     { tutup: "13:35 WIB", result: "14:00 WIB" },
-  "TAIPEI":        { tutup: "14:30 WIB", result: "15:00 WIB" },
+  "TAIPEI":       { tutup: "14:30 WIB", result: "15:00 WIB" },
   "SGMETRO":      { tutup: "11:30 WIB", result: "12:00 WIB" },
   "BUSANDAY":     { tutup: "15:00 WIB", result: "15:30 WIB" },
   "SINGAPORE":    { tutup: "17:35 WIB", result: "17:45 WIB" },
@@ -78,8 +79,8 @@ const JADWAL_JAM = {
 };
 
 const JADWAL_OFF = {
-  "SINGAPORE": [2, 5], // Selasa & Jumat
-  "TAIPEI": [1]        // Senin
+  "SINGAPORE": [2, 5],
+  "TAIPEI": [1]
 };
 
 const DAFTAR_SHIO = [
@@ -374,7 +375,7 @@ async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tangga
       const cards = targetBanner.querySelectorAll('.card-pasaran');
       data.slice(0, 6).forEach((item, index) => {
         const card = cards[index];
-        if (!card) return;
+        if (!card || !item) return;
 
         const namaDisplay = mapDisplay[item.pasaran] || item.pasaran;
         const titleElem = card.querySelector('.pasaran-title');
@@ -429,7 +430,6 @@ async function runBot() {
   const tanggalFormatted = getFormattedDateWIB();
   const currentDayWIB = getDayOfWeekWIB();
 
-  // FLAG DETEKSI REPEAT MODE GRUP 2
   const isOnlyGroup2 = process.env.ONLY_GROUP_2 === 'true';
 
   console.log(`[BOT] Memulai otomatisasi tanggal: ${tanggalWIB} (${tanggalFormatted})`);
@@ -450,6 +450,8 @@ async function runBot() {
     const batch = db.batch();
     const prediksiRef = db.collection('prediksi');
     const allPredictionsMap = {};
+
+    let hasNewWrites = false;
 
     // BACA / INPUT DATA FIRESTORE
     for (const pasaran of DAFTAR_PASARAN) {
@@ -483,34 +485,33 @@ async function runBot() {
         details = generatePredictionDetails(bbfs);
         jamInfo = JADWAL_JAM[pasaran] || { tutup: "- WIB", result: "- WIB" };
 
-        if (!isOnlyGroup2) {
-          const payload = {
-            pasaran, 
-            tanggal: tanggalWIB, 
-            bbfs,
-            jamTutup: jamInfo.tutup, 
-            jamResult: jamInfo.result,
-            colokBebas: details.cb, 
-            colok_bebas: details.cb,
-            colokMacau: details.cm, 
-            colok_macau: details.cm,
-            shio: details.shio, 
-            twin: details.twin,
-            d2: details.d2, 
-            d3: details.d3, 
-            d4: details.d4,
-            createdBy: "BOT_AUTOMATION",
-            createdAt: admin.firestore.FieldValue.serverTimestamp()
-          };
+        const payload = {
+          pasaran, 
+          tanggal: tanggalWIB, 
+          bbfs,
+          jamTutup: jamInfo.tutup, 
+          jamResult: jamInfo.result,
+          colokBebas: details.cb, 
+          colok_bebas: details.cb,
+          colokMacau: details.cm, 
+          colok_macau: details.cm,
+          shio: details.shio, 
+          twin: details.twin,
+          d2: details.d2, 
+          d3: details.d3, 
+          d4: details.d4,
+          createdBy: "BOT_AUTOMATION",
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        };
 
-          batch.set(prediksiRef.doc(docId), payload, { merge: true });
-        }
+        batch.set(prediksiRef.doc(docId), payload, { merge: true });
+        hasNewWrites = true;
       }
 
       allPredictionsMap[pasaran] = { pasaran, bbfs, details };
     }
 
-    if (!isOnlyGroup2) {
+    if (hasNewWrites) {
       await batch.commit();
       console.log(`[BOT] ✅ Firestore & History Panel terverifikasi sinkron.`);
     }
@@ -521,10 +522,11 @@ async function runBot() {
     if (!isOnlyGroup2) {
       for (const pasaran of DAFTAR_PASARAN) {
         const pred = allPredictionsMap[pasaran];
-        const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, pred.bbfs, pred.details);
-        
-        await sendTelegramTextMessage(textMsg, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_TEXT_ID);
-        await delay(50);
+        if (pred) {
+          const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, pred.bbfs, pred.details);
+          await sendTelegramTextMessage(textMsg, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_TEXT_ID);
+          await delay(50);
+        }
       }
       console.log(`[BOT] ✅ Seluruh teks 18 pasaran terkirim ke Grup Utama.`);
     }
@@ -554,7 +556,7 @@ async function runBot() {
     const renderedBanners = await renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tanggalFormatted);
 
     // ----------------------------------------------------
-    // PROSES 3: KIRIM GAMBAR (FIXED RATE-LIMIT & MULTI-GROUP)
+    // PROSES 3: KIRIM GAMBAR (MULTI-GROUP)
     // ----------------------------------------------------
     for (const item of renderedBanners) {
       let fileId = null;
@@ -571,26 +573,22 @@ async function runBot() {
           console.error(`[TELEGRAM ERROR] ❌ Gagal kirim ${item.bannerId} ke Grup Utama.`);
         }
 
-        // Jeda 1 detik setelah upload Grup 1
         await delay(1000);
       }
 
-      // 2. Kirim Ke Grup 2 (Selalu Berjalan)
+      // 2. Kirim Ke Grup 2
       if (fileId) {
-        // Kirim via file_id (Instan)
         const res2 = await sendTelegramBannerPhoto(fileId, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
         if (res2 && res2.ok) {
           console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup 2 (via file_id).`);
         }
       } else {
-        // Fallback: Kirim via Buffer (Jika repeat run ATAU jika upload Grup 1 gagal)
         const res2 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
         if (res2 && res2.ok) {
           console.log(`[TELEGRAM] ✅ Gambar ${item.bannerId} terkirim ke Grup 2 (via buffer).`);
         }
       }
 
-      // Jeda aman 1.5 detik antar banner
       await delay(1500);
     }
 
@@ -598,6 +596,7 @@ async function runBot() {
 
   } catch (error) {
     console.error("[BOT] ❌ Error Utama:", error);
+    process.exit(1);
   }
 }
 
