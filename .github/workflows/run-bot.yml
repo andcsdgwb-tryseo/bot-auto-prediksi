@@ -29,11 +29,12 @@ jobs:
           PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
         run: npm install
 
-      # PASANG BROWSER CHROME UNTUK PUPPETEER
       - name: Install Chrome for Puppeteer
+        # Hanya unduh Chrome jika dipicu MANUAL oleh Admin (Full Run butuh Puppeteer)
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'repository_dispatch'
         run: npx puppeteer browsers install chrome
 
-      - name: Deteksi Mode Jam WIB & Jalankan Bot
+      - name: Deteksi Event & Jalankan Bot
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -43,15 +44,16 @@ jobs:
           TELEGRAM_CHAT_ID_2: ${{ secrets.TELEGRAM_CHAT_ID_2 }}
           TELEGRAM_TOPIC_GAMBAR_2_ID: ${{ secrets.TELEGRAM_TOPIC_GAMBAR_2_ID }}
         run: |
-          JAM_WIB=$(TZ='Asia/Jakarta' date +'%H')
-          echo "Jam Eksekusi Server (WIB): $JAM_WIB:00"
-          
-          if [ "$JAM_WIB" = "00" ] || [ "$JAM_WIB" = "01" ]; then
-            echo "Mode: FULL RUN (Grup 1 + Grup 2)"
-            export ONLY_GROUP_2=false
+          JAM_WIB=$(TZ='Asia/Jakarta' date +'%H:%M')
+          echo "Waktu Eksekusi (WIB): $JAM_WIB"
+          echo "Pemicu Event: ${{ github.event_name }}"
+
+          # JIKA DIPICU MANUAL (PANEL ADMIN) -> PASTI FULL RUN
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "Mode: FULL RUN (Pemicu Manual Admin)"
+            ONLY_GROUP_2=false node bot-auto.js
           else
-            echo "Mode: REPEAT GAMBAR (Hanya Grup 2)"
-            export ONLY_GROUP_2=true
+            # JIKA DIPICU OTOMATIS (CRON SCHEDULE 2 JAMAN) -> PASTI REPEAT GRUP 2
+            echo "Mode: REPEAT GAMBAR (Otomatis Per 2 Jam -> Hanya Grup 2)"
+            ONLY_GROUP_2=true node bot-auto.js
           fi
-          
-          node bot-auto.js
