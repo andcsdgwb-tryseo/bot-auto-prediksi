@@ -249,7 +249,6 @@ function sendTelegramTextMessage(textMessage) {
   });
 }
 
-// KIRIM BERDASARKAN FILE_ID ATAU BUFFER
 function sendTelegramBannerPhoto(photoSource, captionText, targetChatId = null, targetTopicId = null) {
   return new Promise((resolve) => {
     const chatId = targetChatId || TELEGRAM_CHAT_ID;
@@ -272,7 +271,6 @@ function sendTelegramBannerPhoto(photoSource, captionText, targetChatId = null, 
       ]
     };
 
-    // JIKA MEMAKAI FILE_ID (TEKS STRING) - SUPER FAST
     if (typeof photoSource === 'string') {
       const postData = JSON.stringify({
         chat_id: chatId,
@@ -306,7 +304,6 @@ function sendTelegramBannerPhoto(photoSource, captionText, targetChatId = null, 
       req.write(postData);
       req.end();
     } else {
-      // JIKA MEMAKAI BUFFER (FILE MENTAH PUPPETEER)
       const form = new FormData();
       form.append('chat_id', chatId);
       if (topicId) form.append('message_thread_id', topicId);
@@ -430,19 +427,48 @@ async function runBot() {
   console.log(`[BOT] Memulai otomatisasi tanggal: ${tanggalWIB} (${tanggalFormatted})`);
   console.log(`[BOT] Mode Eksekusi: ${IS_ONLY_GROUP_2 ? 'REPEAT (Hanya Grup 2)' : 'FULL RUN (Grup 1 + Grup 2)'}`);
 
+  const captionBase = `🎯 <b>PREDIKSI TOGEL ${tanggalFormatted}</b> 🎯\n\n` +
+                      `🔥 <b>Angka pilihan hari ini sudah siap!</b>\n` +
+                      `💰 BIDIK ANGKA • INCAR JP • KEJAR MENANG 💰\n\n` +
+                      `⚡ Prediksi tajam, pilihan terbaik, dan jadwal lengkap berbagai pasaran.\n\n` +
+                      `✨ Cek angka pilihanmu dan tetap bermain secara bijak.`;
+
   try {
+    const bannerCacheRef = db.collection('banner_cache').doc(tanggalWIB);
+    const cacheSnap = await bannerCacheRef.get();
+    let cachedFileIds = cacheSnap.exists ? cacheSnap.data().fileIds : null;
+
+    // ----------------------------------------------------
+    // ALUR A: REPEAT KHUSUS GRUP 2 (BERJALAN PER 2 JAM)
+    // ----------------------------------------------------
+    if (IS_ONLY_GROUP_2) {
+      if (cachedFileIds && cachedFileIds.length > 0) {
+        console.log("[BOT] 🚀 Mode REPEAT Aktif. Mengirim Cache File_ID ke Grup 2...");
+        for (const item of cachedFileIds) {
+          await sendTelegramBannerPhoto(item.fileId, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
+          await delay(1000);
+        }
+        console.log("[BOT] ✅ Repeat ke Grup 2 sukses terkirim!");
+      } else {
+        console.log("[BOT] ⚠️ Mode REPEAT aktif tapi belum ada cache File_ID di Firestore!");
+      }
+      return; // Selesai untuk mode repeat (tidak ganggu status Panel Admin)
+    }
+
+    // ----------------------------------------------------
+    // ALUR B: FULL RUN (HANYA JIKA DIBUKA DARI PANEL ADMIN)
+    // ----------------------------------------------------
     const botConfigDoc = await db.collection('settings').doc('bot_control').get();
     if (botConfigDoc.exists && botConfigDoc.data().active === false) {
-      console.log("[BOT] Status bot OFF di Panel Admin. Eksekusi dibatalkan.");
+      console.log("[BOT] Status bot OFF di Panel Admin. FULL RUN dibatalkan.");
       return;
     }
 
     const batch = db.batch();
     const prediksiRef = db.collection('prediksi');
-    const bannerCacheRef = db.collection('banner_cache').doc(tanggalWIB);
     const allPredictionsMap = {};
 
-    // 1. SINKRONISASI DATA FIRESTORE
+    // 1. GENERATE / SINKRONISASI DATA KE FIRESTORE (Otomatis Tampil di History & Page Player)
     for (const pasaran of DAFTAR_PASARAN) {
       const docId = `${tanggalWIB}_${pasaran.replace(/\s+/g, '')}`;
       const docSnap = await prediksiRef.doc(docId).get();
@@ -493,38 +519,17 @@ async function runBot() {
 
     await batch.commit();
 
-    const captionBase = `🎯 <b>PREDIKSI TOGEL ${tanggalFormatted}</b> 🎯\n\n` +
-                        `🔥 <b>Angka pilihan hari ini sudah siap!</b>\n` +
-                        `💰 BIDIK ANGKA • INCAR JP • KEJAR MENANG 💰\n\n` +
-                        `⚡ Prediksi tajam, pilihan terbaik, dan jadwal lengkap berbagai pasaran.\n\n` +
-                        `✨ Cek angka pilihanmu dan tetap bermain secara bijak.`;
-
-    // 2. CEK CACHE FILE_ID UNTUK REPEAT SUPER CEPAT
-    const cacheSnap = await bannerCacheRef.get();
-    let cachedFileIds = cacheSnap.exists ? cacheSnap.data().fileIds : null;
-
-    if (IS_ONLY_GROUP_2 && cachedFileIds) {
-      console.log("[BOT] 🚀 Menggunakan Cache File_ID untuk pengiriman super cepat ke Grup 2...");
-      for (const item of cachedFileIds) {
-        await sendTelegramBannerPhoto(item.fileId, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
-        await delay(1000);
-      }
-      console.log("[BOT] ✅ Pengiriman repeat via File_ID selesai!");
-      return;
-    }
-
-    // 3. JIKA BELUM ADA FILE_ID / FULL RUN: RENDER VIA PUPPETEER
-    if (!IS_ONLY_GROUP_2) {
-      for (const pasaran of DAFTAR_PASARAN) {
-        const pred = allPredictionsMap[pasaran];
-        if (pred) {
-          const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, pred.bbfs, pred.details);
-          await sendTelegramTextMessage(textMsg);
-          await delay(100);
-        }
+    // 2. KIRIM TEKS PREDIKSI KE GRUP 1
+    for (const pasaran of DAFTAR_PASARAN) {
+      const pred = allPredictionsMap[pasaran];
+      if (pred) {
+        const textMsg = formatTelegramMessage(pasaran, tanggalFormatted, pred.bbfs, pred.details);
+        await sendTelegramTextMessage(textMsg);
+        await delay(100);
       }
     }
 
+    // 3. RENDER GAMBAR PUPPETEER & KIRIM KE GRUP 1 + GRUP 2
     const group1Data = KELOMPOK_PASARAN_1.map(p => allPredictionsMap[p]).filter(Boolean);
     const group2Data = KELOMPOK_PASARAN_2.map(p => allPredictionsMap[p]).filter(Boolean);
     const macauGroupData = KELOMPOK_MACAU.map(p => allPredictionsMap[p]).filter(Boolean);
@@ -546,7 +551,7 @@ async function runBot() {
       const resGrup1 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_GAMBAR_ID);
       await delay(1500);
 
-      // Simpan File_ID yang didapatkan dari Telegram
+      // Ambil File_ID dari Telegram
       let fileId = null;
       if (resGrup1 && resGrup1.ok && resGrup1.result && resGrup1.result.photo) {
         const photos = resGrup1.result.photo;
@@ -554,19 +559,19 @@ async function runBot() {
         newFileIds.push({ bannerId: item.bannerId, fileId });
       }
 
-      // Kirim Gambar ke Grup Kedua (Grup 2) menggunakan file_id jika ada, atau buffer jika tidak ada
+      // Kirim Gambar ke Grup Kedua (Grup 2)
       await sendTelegramBannerPhoto(fileId || item.buffer, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
       await delay(1500);
     }
 
-    // Simpan File_ID ke Firestore untuk eksekusi repeat selanjutnya
+    // Simpan File_ID ke Firestore untuk Repeat Per 2 Jam
     if (newFileIds.length > 0) {
       await bannerCacheRef.set({
         tanggal: tanggalWIB,
         fileIds: newFileIds,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
-      console.log("[BOT] ✅ File_ID berhasil disimpan ke Firestore untuk repeat berikutnya.");
+      console.log("[BOT] ✅ File_ID berhasil disimpan ke Firestore.");
     }
 
   } catch (error) {
