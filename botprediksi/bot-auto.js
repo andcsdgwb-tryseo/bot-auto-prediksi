@@ -530,9 +530,9 @@ async function runBot() {
     }
 
     // 3. RENDER GAMBAR PUPPETEER & KIRIM KE GRUP 1 + GRUP 2
-    const group1Data = KELOMPOK_PASARAN_1.map(p => allPredictionsMap[p]).filter(Boolean);
-    const group2Data = KELOMPOK_PASARAN_2.map(p => allPredictionsMap[p]).filter(Boolean);
-    const macauGroupData = KELOMPOK_MACAU.map(p => allPredictionsMap[p]).filter(Boolean);
+   const group1Data = KELOMPOK_PASARAN_1.map(p => allPredictionsMap[p] || { pasaran: p, bbfs: '-', details: {} });
+    const group2Data = KELOMPOK_PASARAN_2.map(p => allPredictionsMap[p] || { pasaran: p, bbfs: '-', details: {} });
+    const macauGroupData = KELOMPOK_MACAU.map(p => allPredictionsMap[p] || { pasaran: p, bbfs: '-', details: {} });
 
     const templateHtmlPath = path.join(__dirname, 'template.html');
     const allGroups = [
@@ -543,6 +543,8 @@ async function runBot() {
 
     console.log(`[BOT] Merender 3 banner via Puppeteer...`);
     const renderedBanners = await renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tanggalFormatted);
+
+    console.log(`[BOT] Jumlah banner berhasil dirender: ${renderedBanners.length}`);
 
     const newFileIds = [];
 
@@ -557,8 +559,9 @@ async function runBot() {
         const photos = resGrup1.result.photo;
         fileId = photos[photos.length - 1].file_id;
         newFileIds.push({ bannerId: item.bannerId, fileId });
+        console.log(`[BOT] File ID ${item.bannerId} didapatkan: ${fileId.slice(0, 15)}...`);
       } else {
-        console.error(`[BOT] Gagal mendapatkan file_id untuk ${item.bannerId}`);
+        console.error(`[BOT] Gagal mendapatkan file_id untuk ${item.bannerId}`, JSON.stringify(resGrup1));
       }
 
       console.log(`[BOT] Mengirim ${item.bannerId} ke Grup 2...`);
