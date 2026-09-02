@@ -355,7 +355,7 @@ async function renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tangga
   });
 
   const page = await browser.newPage();
-  await page.setViewport({ width: 1200, height: 1500, deviceScaleFactor: 3 });
+  await page.setViewport({ width: 1024, height: 1280, deviceScaleFactor: 3 });
   await page.goto(`file://${fullPath}`, { waitUntil: 'domcontentloaded' });
 
   await page.evaluate((groups, tgl, mapDisplay) => {
@@ -443,16 +443,16 @@ async function runBot() {
     // ----------------------------------------------------
     if (IS_ONLY_GROUP_2) {
       if (cachedFileIds && cachedFileIds.length > 0) {
-        console.log("[BOT] 🚀 Mode REPEAT Aktif. Mengirim Cache File_ID ke Grup 2...");
+        console.log(`[BOT] 🚀 Mode REPEAT Aktif. Mengirim ${cachedFileIds.length} gambar via File_ID ke Grup 2...`);
         for (const item of cachedFileIds) {
           await sendTelegramBannerPhoto(item.fileId, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
-          await delay(1000);
+          await delay(1500);
         }
         console.log("[BOT] ✅ Repeat ke Grup 2 sukses terkirim!");
       } else {
         console.log("[BOT] ⚠️ Mode REPEAT aktif tapi belum ada cache File_ID di Firestore!");
       }
-      return; // Selesai untuk mode repeat (tidak ganggu status Panel Admin)
+      return;
     }
 
     // ----------------------------------------------------
@@ -468,7 +468,7 @@ async function runBot() {
     const prediksiRef = db.collection('prediksi');
     const allPredictionsMap = {};
 
-    // 1. GENERATE / SINKRONISASI DATA KE FIRESTORE (Otomatis Tampil di History & Page Player)
+    // 1. GENERATE / SINKRONISASI DATA KE FIRESTORE
     for (const pasaran of DAFTAR_PASARAN) {
       const docId = `${tanggalWIB}_${pasaran.replace(/\s+/g, '')}`;
       const docSnap = await prediksiRef.doc(docId).get();
@@ -541,37 +541,39 @@ async function runBot() {
       { bannerId: 'banner-3', data: macauGroupData }
     ];
 
-    console.log(`[BOT] Merender banner via Puppeteer...`);
+    console.log(`[BOT] Merender 3 banner via Puppeteer...`);
     const renderedBanners = await renderAllBannersAndGetBuffers(allGroups, templateHtmlPath, tanggalFormatted);
 
     const newFileIds = [];
 
+    // LAKUKAN PROSES MANDIRI UNTUK MASING-MASING BANNER (3 GAMBAR)
     for (const item of renderedBanners) {
-      // Kirim Gambar ke Grup Utama (Grup 1)
+      console.log(`[BOT] Mengirim ${item.bannerId} ke Grup 1...`);
       const resGrup1 = await sendTelegramBannerPhoto(item.buffer, captionBase, TELEGRAM_CHAT_ID, TELEGRAM_TOPIC_GAMBAR_ID);
       await delay(1500);
 
-      // Ambil File_ID dari Telegram
       let fileId = null;
       if (resGrup1 && resGrup1.ok && resGrup1.result && resGrup1.result.photo) {
         const photos = resGrup1.result.photo;
         fileId = photos[photos.length - 1].file_id;
         newFileIds.push({ bannerId: item.bannerId, fileId });
+      } else {
+        console.error(`[BOT] Gagal mendapatkan file_id untuk ${item.bannerId}`);
       }
 
-      // Kirim Gambar ke Grup Kedua (Grup 2)
+      console.log(`[BOT] Mengirim ${item.bannerId} ke Grup 2...`);
       await sendTelegramBannerPhoto(fileId || item.buffer, captionBase, TELEGRAM_CHAT_ID_2, TELEGRAM_TOPIC_GAMBAR_2_ID);
       await delay(1500);
     }
 
-    // Simpan File_ID ke Firestore untuk Repeat Per 2 Jam
+    // Simpan Ke-3 File_ID ke Firestore untuk Repeat Per 2 Jam
     if (newFileIds.length > 0) {
       await bannerCacheRef.set({
         tanggal: tanggalWIB,
         fileIds: newFileIds,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
-      console.log("[BOT] ✅ File_ID berhasil disimpan ke Firestore.");
+      console.log(`[BOT] ✅ ${newFileIds.length} File_ID berhasil disimpan ke Firestore.`);
     }
 
   } catch (error) {
